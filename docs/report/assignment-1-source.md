@@ -1,4 +1,4 @@
-<!-- Working report text based on the 2026-10-14 Google Doc export. Sections 2.2, 2.4, 2.5, and 2.6 updated and Section 4 added locally on 2026-10-15. Related open questions and ADR wording aligned with the proposed baseline. Original diagram images are not included; new supporting Mermaid sources are in docs/diagrams/. Original: https://docs.google.com/document/d/1BZzcQYcdMwUVwqeCP_boOUC6ZeL1ItNhos_O01MjAJY/edit -->
+<!-- Working report text based on the 2026-10-14 Google Doc export. Sections 2.2, 2.4, 2.5, 2.6, and 4 simplified locally for oral-exam preparation. Related open questions, behaviour, and ADR wording aligned with those sections. Original diagram images are not included; new supporting Mermaid sources are in docs/diagrams/. Original: https://docs.google.com/document/d/1BZzcQYcdMwUVwqeCP_boOUC6ZeL1ItNhos_O01MjAJY/edit -->
 
 # **Sila (صِلة)**
 
@@ -290,8 +290,8 @@ The appeal workflow and proposed technical design require team confirmation befo
 | ----- | ----- |
 | Which university domains will be accepted? | University administrator |
 | Is external AI processing permitted? | University policy owner |
-| Which deployment account/domain, email provider, and permitted AI provider/model will be used? The database, editor, and authentication baseline is specified in Section 2.2. | Coder with university approval |
-| Who will operate the monitoring and backup plan in Section 2.2, and approve production retention in Section 2.6? | Team and university deployment owner |
+| Which hosting, email provider, and permitted AI provider/model will be used? | Coder with university approval |
+| Who will configure monitoring, backups, and restoration to meet Section 1.3 targets? | Team and university deployment owner |
 
 ### **Architecture Identifiers**
 
@@ -357,55 +357,53 @@ One backend divided into modules keeps development and deployment manageable. Th
 
 ## **2.2 System Design**
 
-The Assignment 2 design uses a React frontend, one modular FastAPI backend, and PostgreSQL. The choices below form the proposed implementation baseline for team review. The current Assignment 1 application remains the smaller plain-text PoC described in Sections 2.4 and 4; it has no database, authentication, rich-text editor, WebSockets, or AI integration.
+The planned Assignment 2 system uses React, FastAPI, and PostgreSQL. This design is separate from the smaller Assignment 1 PoC and remains subject to team review.
 
 ### **2.2.1 Context and containers**
 
-Sila serves students, community organizers, moderators, and administrators at one university per deployment. Approved university email domains are configuration values. Email verifies account ownership; an external AI service supplies summaries only when university policy permits processing the selected discussion.
+The context diagram shows students, organizers, moderators, and administrators using Sila at one university. Email verification and AI summaries use external services outside Sila's boundary.
 
-| Container | Selected design | Responsibility |
-| ----- | ----- | ----- |
-| WEB | React with the Tiptap editor | Pages, forms, audience selection, rich-text editing, and display of saved draft updates |
-| API | Python/FastAPI, components C1–C7 | Authentication, authorization, business rules, HTTP endpoints, and WebSocket connections |
-| DB | PostgreSQL, accessed through SQLAlchemy; Alembic migrations | Persistent records, constraints, and transactions |
+The container diagram shows three parts inside that boundary:
 
-The browser and API share one HTTPS origin. A reverse proxy serves the React build and forwards `/api/v1/` requests, including secure WebSocket connections, to FastAPI. Only the backend accesses PostgreSQL and external service credentials. Database access is private to the deployment network.
+| Part | Technology and purpose |
+| ----- | ----- |
+| WEB | React: pages, forms, rich-text editing, and display of live updates |
+| API | Python/FastAPI: requests, permissions, business rules, and WebSocket connections |
+| DB | PostgreSQL: linked records such as users, posts, and communities |
 
-The existing context, container, and component figures are maintained in [the team's Canva design](https://canva.link/mnbu5ng6gg0l7hs). They must use the WEB/API/DB and C1–C7 names above. The text export lacks those images. The new editable deployment diagram in `docs/diagrams/assignment-2-deployment.mmd` supplements the figures; it does not replace their original editable sources.
+React sends requests to FastAPI over HTTPS. WebSockets carry saved draft updates. FastAPI accesses PostgreSQL and calls the email and AI services; the browser does not access them directly.
+
+React, rich text, FastAPI, WebSockets, and an LLM meet Assignment 2's technology constraints. PostgreSQL fits the linked data and lets related changes succeed or fail together.
 
 ### **2.2.2 Backend components**
 
+The component diagram looks inside API. C1–C7 are modules in one backend, not separate applications.
+
 | Component | Responsibility |
 | ----- | ----- |
-| C1: HTTP and WebSocket Gateway | Validate and route requests and events |
-| C2: Identity and Access Control | Check accounts, global roles, ownership, membership, and audiences |
+| C1: HTTP and WebSocket Gateway | Receive and route requests and events |
+| C2: Identity and Access Control | Check accounts, roles, ownership, and audiences |
 | C3: Community Management | Manage communities, membership, and official status |
-| C4: Publishing and Interaction | Manage posts, comments, likes, and content validation |
-| C5: Draft Collaboration | Manage draft versions, publication, and saved-update notifications |
-| C6: Moderation and Appeals | Manage reports, decisions, appeals, and audit records |
-| C7: AI Integration | Collect authorized discussion text, call the provider, and validate results |
+| C4: Publishing and Interaction | Validate and manage posts, comments, and likes |
+| C5: Draft Collaboration | Check draft versions, save, publish, and send updates |
+| C6: Moderation and Appeals | Handle reports, decisions, appeals, and their records |
+| C7: AI Integration | Send permitted content and check summary responses |
 
-These are modules within one application. Services own business transactions; repositories perform database operations within those transactions. C2 checks permissions for HTTP actions, WebSocket subscriptions, saves, and delivery of protected updates.
+One backend keeps shared permission rules and database changes together.
 
 ### **2.2.3 Authentication and rich text**
 
-Authentication will use university email verification, passwords hashed with Argon2 through `pwdlib`, and opaque server-side sessions stored in PostgreSQL. This avoids adding a separate identity provider to the initial implementation. The password-hashing library choice follows [FastAPI's password-hashing guidance](https://fastapi.tiangolo.com/tutorial/security/oauth2-jwt/); Sila's proposed session mechanism does not use that tutorial's JWT flow.
+Users verify an approved university email address. Passwords are stored as hashes, not readable passwords. A cookie identifies the login session; logout ends it. The backend checks permissions before protected actions and updates.
 
-Each login generates a fresh random session token. The database stores its hash; the browser receives it in a `Secure`, `HttpOnly`, `SameSite=Lax` cookie. State-changing requests require CSRF protection and origin checks. WebSocket handshakes check the origin and session; expiry, logout, or lost permissions stop further protected actions and updates. Proposed defaults are a 30-minute idle timeout, a 12-hour absolute session lifetime, and a 30-minute single-use email verification token. Login, registration, and resend attempts are rate limited. These controls follow [OWASP's session-management guidance](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html).
-
-Tiptap will expose paragraphs, bold, italic, lists, line breaks, and links. Its HTML output fits the `body` string in the proposed interfaces. C4 sanitizes incoming HTML with `nh3`, allowing only the corresponding tags and safe HTTP/HTTPS links; scripts, event handlers, styles, images, and embeds are excluded. Only sanitized HTML is stored and rendered. Both libraries support these capabilities: [Tiptap content formats](https://tiptap.dev/docs/guides/output-json-html) and [nh3 allowlists](https://nh3.readthedocs.io/en/stable/index.html).
-
-For validation, C4 extracts text from the sanitized HTML, decodes entities, represents line breaks and block boundaries as newlines, trims outer whitespace, and counts Unicode code points. A published post must contain 1–2,000 code points. Drafts may be empty while being prepared but cannot publish empty. Comments use plain text with a 1–500 code-point limit. Shared fixtures will keep the browser counter consistent with backend validation. Collaboration uses the versioned save protocol in Section 2.4, with manual conflict resolution.
+The server sanitizes rich text by removing unsafe markup before storing it. Posts allow 1–2,000 visible characters; plain-text comments allow 1–500. Empty drafts may be saved but cannot be published. These limits count Unicode code points after trimming outer whitespace.
 
 ### **2.2.4 Deployment and external services**
 
-The initial deployment target is one Linux host with a TLS reverse proxy, one FastAPI worker, and PostgreSQL on a persistent volume. A single worker allows connected draft clients to share the same in-process broadcast registry. Database transactions remain authoritative; clients retrieve the latest snapshot after reconnecting. Scaling to multiple workers requires shared event distribution and is a later change.
+The plan uses one server running one FastAPI process so WebSocket updates share memory; more processes would need shared messaging.
 
-OPS will collect health checks, error counts, request latency, and connection failures without logging passwords, tokens, or discussion bodies. The proposed backup plan is a daily encrypted database backup to separate storage, seven daily copies, and a restore rehearsal before demonstration. Section 1.3's availability and recovery figures remain targets until measured; this single-host design provides no automatic failover.
+Email verifies accounts. AI summarizes only content the requester may access, and its result is labelled AI-generated. Failure leaves the discussion unchanged. Secrets stay in backend environment variables.
 
-Email and AI use backend HTTPS adapters with timeouts and mocked responses for development. Live service selection requires an approved account, budget, and university data-handling permission. Until those are available, verification delivery is simulated in development and the live AI feature remains disabled. A mock summary must be labelled as a test response. No hosting subscription, email delivery, or live AI integration is claimed by this report.
-
-The remaining external decisions are the deployment account/domain, approved university email domains, email provider, and permitted AI provider/model. The application structure, database, editor, authentication approach, and migration approach above can proceed without inventing those approvals.
+Hosting and providers have not been set up. External AI processing needs university permission. Development can use mocks, meaning simulated service responses, without paid calls. The C4 figures must accompany the final report; editable Mermaid sources supplement them, and Canva edits are listed in `docs/diagrams/canva-changes.md`.
 
 ## **2.3 Behaviour and Design Decisions**
 
@@ -418,15 +416,15 @@ C2 checks permissions before protected requests, draft subscriptions, saves, and
 * Only approved community organizers edit and publish shared announcements.  
 * Moderators and administrators access only the evidence needed for their assigned reviews.
 
-C4 sanitizes rich text and rejects empty content. Limits apply to visible text: 2,000 characters per post and 500 per comment.
+C4 removes unsafe markup from rich-text posts. Published posts and plain-text comments cannot be empty. Limits are 2,000 characters per post and 500 per comment, counted as Unicode code points after trimming outer whitespace. Empty drafts may be saved while being prepared.
 
 **Publishing and Collaboration**
 
-C5 checks the submitted draft version and updates it in one database transaction. Successful saves increase the version and are broadcast after the transaction commits.
+C5 checks the submitted `version` and saves the draft as one operation, so another save cannot overwrite a newer version. Successful saves increase the version. WebSocket updates are sent only after the database saves successfully. Each save has a `request_id` so a retried save is not applied twice.
 
 Outdated saves are rejected. Organizers review the latest content and manually resolve conflicts. After reconnecting, they retrieve the latest saved draft.
 
-Publishing rechecks organizer permissions, creates the post, and marks the draft published in one transaction. Repeated requests must not create duplicate posts.
+Publishing rechecks organizer permissions and the current draft. It creates the post and records the draft link together. Draft’s unique `published_post_id` stores the result; repeated publication returns that post instead of creating another.
 
 **Sequence Diagram**
 
@@ -443,7 +441,7 @@ The diagram shows two organizers who loaded version 7\. The first save creates v
 | Outdated draft save | Reject the save and provide the latest version. |
 | Lost connection | Reauthorize and retrieve the latest draft. |
 | Database save failure | Return an error and broadcast no successful update. |
-| Lost save acknowledgement | Retrieve the current snapshot before retrying. |
+| Lost save acknowledgement | Retrieve the latest draft before retrying. |
 | Permission removed | Reject further actions and stop protected updates. |
 | AI timeout or invalid response | Return an error without changing the discussion. |
 
@@ -453,11 +451,11 @@ C6 allows moderators to dismiss reports or hide reported content. Decisions reco
 
 Affected authors may appeal within seven days. A different moderator reviews the appeal. It escalates to an administrator when independent review is unavailable or university policy is involved.
 
-Hidden content remains review evidence but is excluded from normal access and AI. Appeal resolutions are recorded. Reversing moderation does not restore content independently deleted by its author.
+Hidden content remains review evidence but is excluded from normal access and AI. Appeal resolutions are recorded. Reversing moderation only changes `hidden` back to `published`; it never restores `deleted` content. Content stays hidden if another active decision still requires it.
 
 **AI Summarization**
 
-C7 collects only the selected discussion content the requester may access. It excludes drafts, hidden content, unrelated discussions, and account metadata.
+C7 collects only the selected discussion content the requester may access. It excludes drafts, hidden or deleted content, unrelated discussions, and account metadata.
 
 External processing requires university permission. Results are labeled AI-generated and checked for nonempty content and association with the request. The original discussion remains accessible.
 
@@ -471,271 +469,174 @@ Use browser sessions to test conflicting saves, reconnection, and permission cha
 
 ## **2.4 Interfaces**
 
-Sila has two interface scopes. The Assignment 1 proof of concept implements a local browser-to-backend interface for creating and retrieving plain-text posts. The planned Assignment 2 system adds verified identities, audience controls, collaboration, moderation, and external services. The proposed Assignment 2 interfaces below describe that design; they are not features of the current PoC.
+Section 2.4.1 describes the implemented PoC. The remaining interfaces are planned for Assignment 2.
 
 ### **2.4.1 Implemented proof-of-concept interface**
 
-FastAPI serves the HTML/CSS/JavaScript page at `GET /` and the API at the same address, normally `http://127.0.0.1:8000`. The browser sends HTTP requests and receives JSON. The authoritative PoC specification is `docs/contracts/poc-posts.md`.
+FastAPI serves the page at `GET /` and the API from the same local address. The browser exchanges JSON with the backend. Both post routes need no login and use fictional content. The contract is `docs/contracts/poc-posts.md`.
 
-**Create a post**
+- `POST /posts` requires `application/json` containing a JSON object with a string `body`. Success returns `201` with integer `post_id` and string `body`. Invalid input returns `422` with a string `detail`.
+- `GET /posts` takes no request body and returns `200` with a JSON array, ordered by descending `post_id`. An empty feed returns `[]`.
 
-| Item | Contract |
-| ----- | ----- |
-| Endpoint | `POST /posts` |
-| Request | JSON object with required string field `body`; content type `application/json` |
-| Success | `201 Created`, returning `post_id` and `body` |
-| Validation failure | `422 Unprocessable Entity`, returning a string `detail` |
-| Authorization | None; this is a local demonstration using fictional content |
-
-Example request:
+Example creation on a fresh backend:
 
 ```json
-{"body":"  Our fictional coding club meets on Thursday.  "}
+{"body":"  Club meeting today.  "}
 ```
-
-Example response from a fresh backend:
 
 ```json
-{"post_id":1,"body":"Our fictional coding club meets on Thursday."}
+{"post_id":1,"body":"Club meeting today."}
 ```
 
-The backend requires `body` to be a string without converting other types. It removes leading and trailing whitespace, then accepts 1–2,000 Unicode code points. Internal spaces and line breaks are preserved. The stored and returned text is the trimmed value. Successful creations receive increasing integer IDs starting at 1; rejected requests neither create a post nor consume an ID.
+Retrieving that feed returns `[{"post_id":1,"body":"Club meeting today."}]`.
 
-Every documented validation failure returns HTTP `422` with exactly one of these messages in `detail`:
+The backend rejects non-string values without conversion, trims outer whitespace, and accepts 1–2,000 Unicode code points. Internal spaces and line breaks remain. Stored and returned text is trimmed. IDs start at 1 and increase only after successful creation. Rejected requests create nothing and consume no ID.
 
-| Invalid input | Exact `detail` value |
+Every documented validation failure returns `422` with one exact `detail` message:
+
+| Invalid input | Exact message |
 | ----- | ----- |
 | Malformed JSON | `Request body must be valid JSON.` |
-| JSON value that is not an object | `Request body must be a JSON object.` |
-| Missing `body` field | `The body field is required.` |
+| JSON that is not an object | `Request body must be a JSON object.` |
+| Missing `body` | `The body field is required.` |
 | Non-string `body`, including `null` | `Post body must be a string.` |
-| Empty, whitespace-only, or over-limit body | `Post body must contain 1–2000 characters after trimming.` |
+| Empty, whitespace-only, or over-limit text | `Post body must contain 1–2000 characters after trimming.` |
 
-For example, `{"body":"   "}` returns:
+Posts remain in memory after browser refresh. Restarting the backend clears posts and resets IDs. The backend's count decides acceptance; the browser counter also counts code points. HTML-like input is displayed literally using `textContent`.
 
-```json
-{"detail":"Post body must contain 1–2000 characters after trimming."}
-```
-
-A custom `RequestValidationError` handler converts FastAPI validation errors into this string-based format. Length validation uses the same format.
-
-**Retrieve posts**
-
-| Item | Contract |
-| ----- | ----- |
-| Endpoint | `GET /posts` |
-| Request body | None |
-| Success | `200 OK`, with a JSON array of posts |
-| Ordering | `post_id` descending, newest first |
-| Empty feed | `[]`, also with `200 OK` |
-| Authorization | None |
-
-Example response after two successful creations:
-
-```json
-[
-  {"post_id":2,"body":"Welcome to the club!"},
-  {"post_id":1,"body":"Our first announcement."}
-]
-```
-
-The posts are stored in a Python list in one backend process. Refreshing the browser preserves them while that process runs. Restarting the backend clears the list and resets the IDs. These endpoints demonstrate only the creation and retrieval part of FR-03; they do not implement identity, audience privacy, editing, or deletion.
-
-**Browser handling**
-
-The page retrieves the feed when it opens. Its character counter uses `Array.from(text.trim()).length`; backend validation remains authoritative. Publish is disabled while a submission is pending. After a successful creation, the page clears the textbox and retrieves the feed again. Validation failures preserve the input and display the backend's `detail` message.
-
-If the submission cannot be confirmed because of a network failure, the page tells the user to check the server and refresh to see whether the post was created. It does not automatically resubmit the post. If creation succeeds but feed retrieval fails, it reports those two outcomes separately. Posts are rendered with `textContent`, so HTML-like input appears as text. This is plain-text rendering, not the planned rich-text editor.
+The page loads the feed on opening. Publish is disabled while saving. Success clears the input and reloads the feed; validation failure keeps the input and shows the error. A network failure means the result is unconfirmed, so the page does not automatically retry. It reports separately when creation succeeds but feed refresh fails.
 
 ### **2.4.2 Proposed Assignment 2 HTTP interfaces**
 
-The planned React frontend communicates with C1, the FastAPI HTTP and WebSocket Gateway, using HTTPS and JSON. The proposed routes use `/api/v1` to distinguish them from the simplified PoC routes. C2 checks the authenticated identity, verification state, roles, ownership, membership, and audience before the appropriate component performs an operation. Client-supplied IDs never establish permission.
+All routes below start with `/api/v1` and use HTTPS and JSON. A login cookie identifies the user. C2 checks verification, ownership, roles, and audience; sending a user ID cannot grant permission.
 
-The proposed session design uses an opaque session identifier in a `Secure`, `HttpOnly`, `SameSite=Lax` cookie. State-changing browser requests also require CSRF protection and origin validation. Login establishes a session; logout invalidates it. Registration, verification, and login remain accessible without an existing session. Section 2.2 specifies backend-managed accounts, password hashing, session lifetimes, and the deployment baseline; live email and AI providers still require selection and approval.
+Success uses `200` for reads/updates, `201` for creation, and `204` for deletion with no response body. Errors contain a string `detail`: `401` means login is missing or invalid; `403`, permission denied; `404`, unavailable or hidden resource; `409`, conflicting state; `422`, invalid input; `500`, unexpected server failure; `502`, failed or invalid provider response; `503`, service unavailable; and `504`, provider timeout. Errors do not expose secrets.
 
-Successful reads and updates use `200`, creations use `201`, accepted asynchronous operations use `202`, and successful deletions without a response body use `204`. Errors use a JSON object with a string `detail`: `401` for missing or invalid authentication, `403` for a known operation the user cannot perform, `404` for an unavailable resource, `409` for a conflicting state, and `422` for invalid input. Resource lookups use `404` where revealing that restricted content exists would disclose information. Unexpected internal failures return a generic `500` without credentials, database errors, or stack traces.
-
-The following are the main proposed frontend/backend interactions. Path IDs identify the target; the server derives the acting user's identity from the session.
-
-| Area and routes | Main request and response fields | Permission and failure rules |
+| Route, after `/api/v1` | Main fields exchanged | Who is allowed; main failures |
 | ----- | ----- | ----- |
-| Accounts: `POST /api/v1/accounts`, `POST /api/v1/accounts/verify`, `POST /api/v1/sessions`, `DELETE /api/v1/sessions/current` | Registration: `email`, `password`; verification: `token`; login: `email`, `password`. Responses report verification status or authenticated `user_id` and roles; never return passwords. | C2 validates the approved university domain and verification token. Invalid input returns `422`; invalid login returns a generic `401`; unverified users cannot access protected features. Email delivery failures permit retry without granting verified access. |
-| Communities: `POST /api/v1/communities`, `POST /api/v1/communities/{community_id}/memberships` | Community: `name`, `visibility`; response: `community_id`, `name`, `visibility`. Joining returns `community_id`, `user_id`, and membership `status`. | Verified users may create communities. Open-community joins become approved; restricted-community joins become pending. Organizer approval is checked by C2/C3. Invalid visibility returns `422`; unauthorized membership decisions return `403`. |
-| Official status: `POST /api/v1/communities/{community_id}/official-requests`, `PATCH /api/v1/official-requests/{request_id}` | Request: `reason`; decision: `status`. Response includes `request_id`, `community_id`, and `status`. | Organizers request status; university administrators approve or reject it. Unauthorized decisions return `403`; incompatible repeat decisions return `409`. |
-| Posts and audiences: `POST /api/v1/posts`, `GET /api/v1/posts`, `PATCH /api/v1/posts/{post_id}`, `DELETE /api/v1/posts/{post_id}` | Create/update: rich-text `body`, `audience`, optional `community_id`. Returned posts include `post_id`, `body`, `author_id`, `audience`, and `community_id`. | C2/C4 enforce ownership and audience permissions. Restricted-community posts cannot target a wider audience. Validate sanitized visible text against the 2,000-character limit. Invalid content or audience combinations return `422`; denied actions return `403` or a non-disclosing `404`. |
-| Interaction: `PUT /api/v1/posts/{post_id}/likes/me`, `DELETE /api/v1/posts/{post_id}/likes/me`, `POST /api/v1/posts/{post_id}/comments` | Likes use no client-supplied user ID; response reports `post_id` and `liked`. Comments accept `body` and return `comment_id`, `post_id`, `author_id`, and `body`. | Only users who can access the post may interact. Repeating the same like does not create another like. Comments must contain 1–500 visible characters; invalid comments return `422`. |
-| Moderation: `POST /api/v1/reports`, `POST /api/v1/reports/{report_id}/decisions` | Report: `target_type`, `target_id`, `reason`; response: `report_id`, `status`. Decision: `action`, `reason`; response: `decision_id`, `action`, `decided_at`. | A report targets one post or comment. C6 restricts decisions to authorized moderators and records the actor and timestamp. Invalid targets return `422`; unauthorized action returns `403`; an already decided report returns `409`. |
-| Appeals: `POST /api/v1/decisions/{decision_id}/appeals`, `PATCH /api/v1/appeals/{appeal_id}` | Appeal: `reason`; response: `appeal_id`, `status`, `submitted_at`. Resolution: `outcome`, `reason`; response includes the outcome and resolution timestamp. | Only the affected author may appeal within seven days. C6 checks the deadline using server timestamps. Late appeals return `422`. A different moderator reviews; escalated cases require an administrator. Unauthorized resolution returns `403`. |
-| AI: `POST /api/v1/posts/{post_id}/summary` | No client-supplied discussion text is trusted. Response: `post_id`, `summary`, `ai_generated: true`. | C2/C7 authorize the published discussion and collect permitted posts/comments. Hidden content and drafts are excluded. Provider failure or invalid output returns `502`, unavailability `503`, and timeout `504`; the original discussion remains unchanged. |
+| `POST /accounts`, `POST /accounts/verify`, `POST /sessions`, `DELETE /sessions/current` | `email`, `password`, or verification `token`; return verification status or `user_id` and roles | Registration/login need no session; logout needs one. Approved university email required. `401`, `422`. |
+| `POST /communities`, `POST /communities/{community_id}/memberships` | `name`, `visibility`; return `community_id` or membership `status` | Verified users. Restricted joins await organizer approval. `403`, `422`. |
+| `POST /communities/{community_id}/official-requests`, `PATCH /official-requests/{request_id}` | Request `reason`; decision `status`; return `request_id`, `community_id`, `status` | Organizers request; administrators decide. `403`, `409`, `422`. |
+| `GET /posts`, `POST /posts`, `PATCH /posts/{post_id}`, `DELETE /posts/{post_id}` | `body`, `audience`, optional `community_id`; returned posts include `post_id`, `author_id` | Verified users; viewers must be in the audience, authors edit/delete. Restricted-community posts stay restricted. `403`, `404`, `422`. |
+| `PUT /posts/{post_id}/likes/me`, `DELETE /posts/{post_id}/likes/me`, `POST /posts/{post_id}/comments` | Like result: `post_id`, `liked`; comment: `body` → `comment_id`, `post_id`, `author_id`, `body` | Permitted viewers. One like per user/post; comments 1–500 characters. `403`, `404`, `422`. |
+| `POST /reports`, `POST /reports/{report_id}/decisions` | `target_type`, `target_id`, `reason`; decision `action`, `reason`; return `report_id`, `status` or `decision_id`, `action`, `decided_at` | Users report accessible content; authorized moderators decide. `403`, `404`, `409`, `422`. |
+| `POST /decisions/{decision_id}/appeals`, `PATCH /appeals/{appeal_id}` | `reason`; resolution `outcome`, `reason`; return `appeal_id`, `status`, `submitted_at` or outcome/time | Affected author appeals within seven days. A different moderator reviews; escalations need an administrator. `403`, `422`. |
+| `GET /drafts/{draft_id}`, `POST /drafts/{draft_id}/publish` | Read: `draft_id`, `body`, `version`; publish: `request_id`, `version` → `draft_id`, `post_id`, `status` | Approved organizers of that community. `403`, `404`, `409`, `422`. |
+| `POST /posts/{post_id}/summary` | Return `post_id`, `summary`, `ai_generated: true` | Permitted viewers; backend selects the discussion text. `403`, `404`, `502`, `503`, `504`. |
 
-For example, a proposed comment request is `{"body":"What time does it start?"}`. A successful `201` response is `{"comment_id":12,"post_id":2,"author_id":7,"body":"What time does it start?"}`. The server supplies the identifiers. This route and its authorization are planned Assignment 2 behaviour, not part of the PoC.
+Post content is sanitized before its 2,000-character limit is checked. Only permitted content is returned.
 
 ### **2.4.3 Proposed collaboration interface**
 
-Authorized community organizers retrieve a draft through `GET /api/v1/drafts/{draft_id}` and subscribe to `/api/v1/drafts/{draft_id}/events` over a secure WebSocket. C1/C2 validate the session and origin when the connection opens. C2/C5 recheck permissions for saves and before sending protected updates. Removed permissions stop further access; reconnecting requires authorization and retrieval of the latest saved draft.
-
-A proposed save message includes its type, draft ID, a unique request ID, the version the editor loaded, and the updated rich-text body:
+Organizers connect to `/api/v1/drafts/{draft_id}/events` over WebSocket. Permissions are checked before saves and protected updates. A save sends the version the organizer loaded:
 
 ```json
 {"type":"draft.save","draft_id":42,"request_id":"save-42-a","version":7,"body":"<p>Club meeting at 4 pm.</p>"}
 ```
 
-C5 validates the content and atomically checks the version while saving. Only after the database commits does it acknowledge the save and broadcast the new version to authorized subscribers:
+The backend checks the version and saves together. Success sends `draft.saved` with `draft_id`, `request_id`, saved `body`, and the new `version` (8 here), then broadcasts the saved update. An outdated save gets `draft.conflict` with those identifiers, the latest body/version, and an explanatory `detail`. Organizers resolve the conflict manually.
 
-```json
-{"type":"draft.saved","draft_id":42,"request_id":"save-42-a","version":8,"body":"<p>Club meeting at 4 pm.</p>"}
-```
+Other failures send `draft.error` with `draft_id`, `request_id`, `code`, and `detail`. Denied users receive no draft content. A failed save broadcasts nothing. These are WebSocket messages, not HTTP status codes.
 
-A second save based on version 7 is rejected without overwriting version 8:
+Each save has a request ID so a retried save is not applied twice. Reconnecting reloads the latest draft after checking permission.
 
-```json
-{"type":"draft.conflict","draft_id":42,"request_id":"save-42-b","version":8,"body":"<p>Club meeting at 4 pm.</p>","detail":"The draft has changed. Review the latest version before saving."}
-```
-
-Other failures use `draft.error` with `draft_id`, `request_id`, a machine-readable `code` such as `invalid_content`, `forbidden`, or `save_failed`, and a safe string `detail`. A denied user receives no protected draft body. These are WebSocket message fields, not HTTP response statuses after the connection is established. Database failure produces no successful save acknowledgement or broadcast.
-
-The proposed retry design records successful request IDs with their outcomes. Repeating the same request and payload returns its saved result without incrementing the version again; reusing the ID for different content is rejected. After losing an acknowledgement, the client retrieves the latest draft before deciding whether to retry. Conflicts require the organizers to review the latest text and resolve their changes manually.
-
-Publishing uses `POST /api/v1/drafts/{draft_id}/publish` with `request_id` and the expected `version`. C5 rechecks organizer permissions and atomically creates the post and marks the draft published. A unique draft-to-post association prevents duplicate publication. First publication returns `201` with `draft_id`, `post_id`, and `status: "published"`; a repeat for the already published draft returns the same post with `200`. An outdated unpublished draft returns `409` with its latest version to an authorized caller.
+Publishing saves the post and its draft link together. Draft's unique `published_post_id` identifies the published result. First publication returns `201`; repeating it returns that same post with `200`. An outdated unpublished draft returns `409`.
 
 ### **2.4.4 Proposed external service interfaces**
 
-Only the backend calls the external email and AI services over HTTPS. Provider credentials remain in backend configuration and never enter frontend code.
+The backend sends the email service a university address and verification link, and receives acceptance or failure. Acceptance does not verify the account; the user must follow a valid link. Failed delivery can be retried.
 
-- **Email service:** C2 sends the recipient university email address and a verification link containing an expiring, single-use token. The adapter returns delivery acceptance or a failure result. Provider acceptance does not mean the user verified their account; verification requires a valid token. Failed delivery supports a controlled resend.
-- **AI service:** C7 sends only the authorized published discussion text needed for the selected summary, excluding drafts, hidden content, unrelated discussions, and account metadata. The backend retains the requested post ID so the result is attached to the correct discussion. It validates nonempty output and labels it AI-generated. Permission is checked again before returning restricted content if the request was long-running. External processing requires university permission; timeouts and invalid output leave the discussion unchanged.
-
-Email and AI adapters will be tested with mocked success, timeout, and failure responses before live integration. Provider-specific payloads will be defined when the team selects those services. None of these external calls are made by the Assignment 1 PoC.
+For AI, the backend sends only authorized published discussion text, excluding drafts and hidden/deleted content. It checks that the response is nonempty and belongs to the requested discussion, then labels it AI-generated. Failure leaves the discussion unchanged. University permission is required before external processing. These services are planned, not connected in the PoC.
 
 ## **2.5 Code and Repository Structure**
 
-The current repository contains the Assignment 1 proof of concept, its contract, tests, report text, and GitHub Actions workflow. The planned React frontend and modular backend for Assignment 2 have not yet been implemented.
+The current repository contains the Assignment 1 PoC. Assignment 2 folders below are planned, not implemented.
 
-**Current repository**
-
-| Location | Contents |
+| Current location | Contents |
 | ----- | ----- |
-| `poc/app/main.py` | FastAPI routes, validation handling, and in-memory post storage |
-| `poc/app/index.html` | Browser interface, styling, and JavaScript |
-| `poc/app/__init__.py` | Python package marker |
-| `poc/tests/test_posts.py` | Automated contract tests |
-| `poc/requirements.txt` | Pinned direct Python dependencies |
-| `poc/README.md` | Setup, run and test commands, demo steps, and limitations |
-| `docs/contracts/poc-posts.md` | Approved PoC interface specification |
-| `docs/report/assignment-1-source.md` | Working report text based on the Google Doc export |
-| `docs/report/section-*.md` | Individual report sections for review and transfer to the shared report |
-| `docs/diagrams/` | New Mermaid sources for the proposed deployment and data relationships, with a scope README |
-| `.github/workflows/poc-tests.yml` | GitHub Actions contract-test workflow |
-| `CLAUDE.md` | Project scope, commands, and AI-assisted workflow instructions |
-| `.gitignore` | Excludes local environments, caches, credentials, and personal settings |
-
-The local Python environment at `poc/.venv/` and personal Claude settings are not committed. The report text export does not contain the original diagram images. The new Mermaid sources supplement the design; the original Canva sources and a final PDF containing readable figures remain submission deliverables.
-
-`poc/requirements.txt` pins FastAPI, Uvicorn, pytest, and httpx2. The existing GitHub Actions workflow runs the PoC tests on Python 3.13 for PRs targeting `main` and pushes to `main` or `feature/poc-posts`. It does not build a React application, provision PostgreSQL, or test the proposed Assignment 2 system.
-
-**Planned Assignment 2 structure**
+| `poc/app/main.py` | FastAPI routes, validation, and in-memory posts |
+| `poc/app/index.html` | Browser page, styling, and JavaScript |
+| `poc/tests/` | Contract tests |
+| `poc/requirements.txt`, `poc/README.md` | Dependencies, setup, tests, and demo instructions |
+| `docs/contracts/`, `docs/report/` | PoC contract and report sections |
+| `docs/diagrams/` | Mermaid sources and Canva change checklist |
+| `.github/workflows/poc-tests.yml` | Automated PoC checks on GitHub |
+| `CLAUDE.md`, `.gitignore` | AI workflow instructions and files excluded from Git |
 
 | Planned location | Responsibility |
 | ----- | ----- |
-| `frontend/` | React pages, forms, Tiptap editor, and WebSocket client |
-| `backend/app/api/` | HTTP routes and WebSocket gateway |
-| `backend/app/services/` | Business components C2–C7 |
-| `backend/app/models/` | SQLAlchemy PostgreSQL models and constraints |
-| `backend/app/repositories/` | Database access and transaction operations |
-| `backend/app/integrations/` | Email and AI HTTPS adapters, with development mocks |
-| `backend/app/core/` | Settings, session handling, and shared security helpers |
-| `backend/migrations/` | Reviewed Alembic schema revisions |
-| `backend/tests/` and `frontend/tests/` | Component and integration tests |
-| `docs/diagrams/` | Additional editable architecture figures and final exports alongside the existing Mermaid sources |
-| `docs/contracts/` | HTTP and WebSocket specifications |
-| `docs/adr/` | Architecture decision records |
-| `config/` and `.env.example` | Nonsecret examples for approved domains, database connection, session/token lifetimes, provider settings, and disabled live AI by default |
-| `ops/` | Deployment, backup, restore, and monitoring procedures |
+| `frontend/` | React pages, rich-text editor, and WebSocket client |
+| `backend/app/api/` | C1: HTTP routes and WebSocket messages |
+| `backend/app/services/` | C2–C7: permission checks and business rules |
+| `backend/app/models/`, `backend/app/repositories/` | Database records and access |
+| `backend/app/integrations/` | Email and AI service calls |
+| `backend/app/core/` | Shared settings and login helpers |
+| `backend/tests/`, `frontend/tests/` | Backend, browser, and integration tests |
+| `config/`, `.env.example` | Configuration examples with placeholders only |
 
-This table describes planned additions; only the locations in the current-repository table already exist. Assignment 2 will be developed alongside `poc/`, preserving the Assignment 1 contract and reproducible demonstration. Its dependency lockfiles and PostgreSQL integration checks will be added with that implementation. Mohammed is responsible for the current proof-of-concept implementation under the recorded team task allocation. Assignment 2 code-maintenance responsibilities will be agreed with the team and recorded in Section 3.1 before those components are developed.
+This separates pages, business rules, and data access so each can be tested. Assignment 2 will sit alongside `poc/`, keeping the demonstration reproducible. Mohammed is responsible for the current PoC under the recorded team allocation; Assignment 2 ownership must be agreed in Section 3.1.
 
-Database passwords, session secrets, email credentials, and AI keys must remain in backend environment variables or a secret manager. They must not appear in repository files or browser code. Configuration examples contain placeholders only.
+Secrets belong only in backend environment variables, never in Git or browser code. Local environments and personal settings are excluded from Git. Existing documentation folders will also hold Assignment 2 material. The original editable Canva figures and final report PDF still need to be included for submission.
 
 ## **2.6 Data Model**
 
-The implemented PoC stores a Python list of records containing only integer `post_id` and string `body`. IDs start at 1 and the list disappears when the process restarts. The relational model below is the proposed Assignment 2 design; no tables or migrations currently exist in the application.
+The PoC stores only integer `post_id` and string `body` in memory. The ER diagram describes the planned PostgreSQL model for Assignment 2, not an existing database.
 
-### **2.6.1 Types and records**
+### **2.6.1 Entities and relationships**
 
-PostgreSQL entity IDs use `BIGINT GENERATED ALWAYS AS IDENTITY` primary keys. Foreign keys use `BIGINT`; timestamps use `TIMESTAMPTZ` with UTC values; free text uses `TEXT`. Status and role values use `TEXT` with `CHECK` constraints. Fields are required unless marked nullable. Each main entity has `created_at`; mutable entities also have `updated_at`. API identifiers retain Section 2.4's names, such as `post_id`, rather than changing the PoC contract.
+Each entity has an ID. References link related records; for example, `author_id` links a post to a user. Membership and Like identify their records using a pair of IDs.
 
-| Record | Principal fields and relationships |
+| Entity | Main information and links |
 | ----- | ----- |
-| User (`users`) | `user_id`; unique normalized `email`; `password_hash`; nullable `verified_at`; `global_role` (student/moderator/admin); `status` (active/disabled) |
-| Community | `community_id`; `created_by` → User; `name`; `visibility` (open/restricted); `is_official BOOLEAN` |
-| Membership | Composite primary key (`community_id`, `user_id`), referencing Community and User; `role` (member/organizer); `status` (pending/approved/rejected) |
-| Post | `post_id`; `author_id` → User; nullable `community_id` → Community; sanitized HTML `body`; `audience` (university/community); independent nullable `hidden_at` and `deleted_at` |
-| Draft | `draft_id`; `community_id` → Community; `created_by` and `updated_by` → User; sanitized HTML `body`; positive `version INTEGER`; nullable unique `published_post_id` → Post; nullable `published_at` |
-| Comment | `comment_id`; `post_id` → Post; `author_id` → User; plain-text `body`; independent nullable `hidden_at` and `deleted_at` |
-| Like | Composite primary key (`post_id`, `user_id`), referencing Post and User; `created_at`; unlike removes the row |
-| OfficialRequest | `request_id`; `community_id` → Community; `requested_by` → User; `reason`; `status` (pending/approved/rejected); nullable `reviewed_by` → User and `reviewed_at` |
-| Report | `report_id`; `reporter_id` → User; exactly one of nullable `post_id` → Post or `comment_id` → Comment; `reason`; protected `evidence_body` snapshot of the reported content |
-| Decision | `decision_id`; unique `report_id` → Report; `moderator_id` → User; `action` (dismiss/hide); `reason`; `decided_at` |
-| Appeal | `appeal_id`; unique `decision_id` → Decision; `appellant_id` → User; `reason`; `status` (pending/escalated/resolved); nullable `reviewer_id` → User, `outcome` (upheld/reversed), `resolution_reason`, and `resolved_at` |
-| AuditRecord | `audit_id`; `actor_id` → User; `action`; `target_type`; `target_id BIGINT`; `reason`; `occurred_at`; reference information for moderation and appeal events |
+| User | `user_id`, unique `email`, `password_hash`, `verified`, `global_role` |
+| Community | `community_id`, `creator_id`, `name`, `visibility`, `official` |
+| Membership | `user_id`, `community_id`, `role`, `status` |
+| Post | `post_id`, `author_id`, optional `community_id`, `audience`, `body`, `status` |
+| Draft | `draft_id`, `community_id`, `owner_id`, `body`, `version`, `status`, optional unique `published_post_id` |
+| Comment | `comment_id`, `post_id`, `author_id`, `body`, `status` |
+| Like | `user_id`, `post_id` |
+| OfficialRequest | `request_id`, `community_id`, `requester_id`, optional `reviewer_id`, `reason`, `status` |
+| Report | `report_id`, `reporter_id`, one target (`post_id` or `comment_id`), `reason`, `status` |
+| Decision | `decision_id`, `report_id`, `moderator_id`, `action`, `reason`, `decided_at` |
+| Appeal | `appeal_id`, `decision_id`, `appellant_id`, optional `reviewer_id`, `reason`, `status`, `submitted_at`; resolution adds `outcome`, `resolution_reason`, `resolved_at` |
+| AuditRecord | `audit_id`, `actor_id`, `action`, `target_type`, `target_id`, `reason`, `recorded_at` |
 
-User global roles are separate from organizer roles held through Membership. `target_id` in AuditRecord is a historical reference selected by `target_type`, not a foreign key to several tables. C6 validates it when appending the record. Report's two concrete foreign keys preserve referential integrity for either supported target.
+Supporting account records hold login sessions and email verification information; their implementation details are outside this ER overview.
 
-The API derives a report's `status` from whether a Decision exists, maps an appeal's `created_at` to `submitted_at`, and maps `resolution_reason` to the resolution request's `reason`. The report request's `target_type` and `target_id` select the corresponding concrete target foreign key.
+### **2.6.2 Constraints and policies**
 
-The supporting records complete the authentication and retry design:
+- Users join communities through Membership. Organizer roles belong to a community, not the whole university. Only approved organizers edit and publish its drafts.
+- A user has at most one membership per community and one like per post. Removing a like removes that pair.
+- A university-wide post may have no community. Community-only posts require one; restricted-community content is limited to approved members.
+- Posts contain sanitized rich text, limited to 2,000 visible characters. Comments contain plain text, limited to 500. Published content cannot be empty.
+- Post and Comment `status` is `published`, `hidden`, or `deleted`. Reversing moderation only changes `hidden` back to `published`; it never restores `deleted` content. Content stays hidden if another active decision still requires it.
+- Draft saves check the loaded version and increase it on success. Publication creates the post and records Draft's unique `published_post_id` together, after checking the draft. Repeated publication returns the linked post instead of creating another.
+- Each report targets exactly one post or comment. Each report has at most one initial decision; each decision has at most one appeal. Only the affected author may appeal within seven days of `decided_at`; a different moderator reviews it.
+- Decisions and appeal outcomes are recorded. Hidden content remains available as review evidence, but not in normal views or AI input. Ordinary users cannot change audit records.
 
-| Record | Fields and rules |
-| ----- | ----- |
-| Session | `session_id`; `user_id` → User; unique `token_hash`; `csrf_token_hash`; `created_at`, `last_seen_at`, `expires_at`; nullable `revoked_at`. Raw session tokens are not stored. |
-| EmailVerification | `verification_id`; `user_id` → User; unique `token_hash`; `created_at`, `expires_at`; nullable `used_at`. Consuming a valid token and verifying the account occur in one transaction. Resending invalidates earlier outstanding tokens. |
-| DraftSaveReceipt | Composite primary key (`draft_id`, `actor_id`, `request_id`), referencing Draft and User; `request_id VARCHAR(64)`; `payload_hash`; `result_version INTEGER`; sanitized `result_body`; `created_at`. Stores the outcome of a successful save for retry detection. |
-
-The editable relationship diagram is `docs/diagrams/assignment-2-data-model.mmd`. It supplements the original [Canva ER figures](https://canva.link/mnbu5ng6gg0l7hs), which must be reconciled with these fields before the final PDF is exported.
-
-### **2.6.2 Integrity and authorization**
-
-Database primary keys, foreign keys, uniqueness, and row checks enforce structural rules. PostgreSQL row checks do not replace authorization or rules involving other records; those belong in service transactions. See [PostgreSQL's constraint documentation](https://www.postgresql.org/docs/current/ddl-constraints.html).
-
-- Membership and Like composite keys prevent duplicates. A partial unique index permits only one pending OfficialRequest per community.
-- A Report check requires exactly one target. Unique Decision.report_id and Appeal.decision_id enforce one initial decision per report and one appeal per decision.
-- A community audience requires a non-null community. C2 additionally checks membership and prevents restricted-community content from using a university audience. Changes to community visibility must preserve that restriction for existing content in the same transaction.
-- Draft versions start at 1. A save locks/checks the current draft, validates organizer access and the submitted version, updates the body and version, and inserts its receipt atomically. A repeated request ID with the same payload returns its recorded result after current authorization; a changed payload is rejected. A unique published-post link and locking the draft during publication prevent duplicate posts.
-- `published_post_id` and `published_at` are either both null or both populated. Publication checks valid nonempty content and creates the post in the same transaction. The publishing organizer is recorded as the post author.
-- Only the affected author may appeal, and only up to seven days after `decided_at`. C6 enforces the deadline and independent reviewer rule. Decision, content visibility change, and audit insertion commit together; appeal resolution likewise updates its outcome, any permitted visibility change, and audit history atomically.
-- Report snapshots preserve evidence if an author later edits the content. Hidden and author-deleted states are separate, so reversing moderation cannot restore author-deleted material. Resolving one report must not undo another active decision to hide the same content.
-
-### **2.6.3 Queries, migrations, and retention**
-
-Initial indexes support membership checks (`user_id`, `status`), community feeds (`community_id`, `created_at`, `post_id`), university feeds (`audience`, `created_at`, `post_id`), comments (`post_id`, `created_at`), drafts (`community_id`, `updated_at`), pending appeals (`status`, `created_at`), reports by each non-null target, and audit history (`target_type`, `target_id`, `occurred_at`). Token hashes are uniquely indexed; expiry timestamps support cleanup. Referencing foreign keys also receive indexes where not already covered. Query plans and representative data will determine refinements.
-
-SQLAlchemy models will live in `backend/app/models/`; reviewed Alembic revisions will live in `backend/migrations/`. Migrations will be tested against an empty database and the preceding schema before deployment, with a backup and recovery plan for destructive changes. [Alembic](https://alembic.sqlalchemy.org/en/latest/tutorial.html) manages schema revisions; it does not make a backup or prove a migration safe.
-
-The development baseline uses fictional data. Expired or consumed verification records and expired/revoked sessions are cleaned daily. Successful draft-save receipts remain for the draft's lifetime, preserving retry results. Author deletion immediately removes content from normal views and AI input; restricted evidence and audit records remain available to authorized reviewers. Account disabling revokes sessions. Foreign keys restrict deletion of referenced evidence rather than cascading away moderation history; the normal application role can insert/read audit records but cannot update/delete them.
-
-A production retention period for account data, evidence, drafts, and audits requires university approval before real student data is collected. A later approved purge must address dependent receipts, evidence, and backup expiry as well as primary records. Daily backups retain seven copies under the proposed deployment plan. AI summaries are returned on demand without a persistent summary table in this baseline.
+The backend checks permissions; database keys and constraints prevent broken links and duplicates. `docs/diagrams/assignment-2-data-model.mmd` shows the same core relationships. Required changes to the original Canva ER figures are listed in `docs/diagrams/canva-changes.md`.
 
 ## **2.7 Architecture Decision Records**
 
 **ADR-01 — Modular Backend**
 
-**Context:** Sila’s features share authorization and database transactions.
+**Context:** Sila’s features share permission rules and related database changes.
 
-**Options:** Unstructured backend, modular backend, or microservices.
+**Options:** One unstructured backend, one modular backend, or several separate services.
 
 **Decision:** Use one FastAPI application divided into components C1–C7.
 
-**Consequences:** Development, deployment, and testing remain manageable. Multiple WebSocket processes would require shared event distribution.
+**Consequences:** One server running one FastAPI process keeps development manageable and lets WebSocket updates share memory. More processes would need shared messaging.
 
 **ADR-02 — Relational Database**
 
-**Context:** Records have relationships, and concurrent draft saves require transactions.
+**Context:** Records have relationships, and simultaneous draft saves must not overwrite each other.
 
 **Options:** In-memory storage, SQLite, PostgreSQL, or a document database.
 
-**Decision:** Use PostgreSQL with SQLAlchemy models and Alembic migrations in the proposed Assignment 2 baseline. The Assignment 1 PoC retains its in-memory list.
+**Decision:** Use PostgreSQL for Assignment 2. The Assignment 1 PoC keeps its in-memory list.
 
-**Consequences:** Supports constraints and atomic updates; requires setup, migrations, and backups.
+**Consequences:** Database rules protect linked records and let related changes succeed or fail together. PostgreSQL needs setup, controlled schema changes, and backups.
 
 **ADR-03 — Versioned Collaboration**
 
@@ -743,21 +644,21 @@ A production retention period for account data, evidence, drafts, and audits req
 
 **Options:** Last-save-wins, version checks, or automatic merging.
 
-**Decision:** Use atomic version checks and WebSocket broadcasts after saving.
+**Decision:** Check the loaded version and save together. Send WebSocket updates only after saving succeeds.
 
-**Consequences:** Prevents silent overwrites, but organizers must manually reconcile conflicts.
+**Consequences:** Prevents silent overwrites, but organizers must compare conflicting versions and resolve them manually.
 
 **ADR-04 — Backend AI Integration**
 
 **Context:** Summarization must respect permissions and protect credentials.
 
-**Options:** Browser calls, provider calls across multiple routes, or a dedicated backend adapter.
+**Options:** Call the provider from the browser, from several backend routes, or through one backend component.
 
-**Decision:** C7 handles input filtering, provider calls, response checks, and failures.
+**Decision:** C7 selects permitted content, calls the provider, checks the response, and handles failures.
 
 **Consequences:** Supports mocks and provider replacement. Accuracy is not guaranteed, and external processing requires university permission.
 
-**Status:** Sections 2.2 and 2.6 specify the proposed technical baseline for team review before submission. Deployment accounts, provider selection, university permissions, and production retention remain external decisions; no implementation or team approval is implied.
+**Status:** These are planned Assignment 2 decisions for team review. Hosting, providers, and university permissions remain open. They are not implemented in the PoC.
 
 ---
 
@@ -863,53 +764,42 @@ Overall, the Sila project has been managed through clear responsibilities, open 
 
 ## **4.1 Purpose and scope**
 
-The Sila proof of concept demonstrates how a browser communicates with a Python backend to create and retrieve posts. It implements the creation and retrieval portion of FR-03 using fictional content. The application is a local demonstration, with no authentication or audience controls. It does not claim to implement the full planned campus social network.
-
-The submitted interface specification is `docs/contracts/poc-posts.md`, summarized in Section 2.4. The implementation is in `poc/`, with setup, execution, tests, and a demonstration checklist in `poc/README.md`.
+The PoC demonstrates a browser creating and retrieving posts through a Python backend. It covers part of FR-03 using fictional data. The code is in `poc/`; `poc/README.md` explains setup, execution, tests, and the demonstration. Section 2.4.1 describes the implemented contract.
 
 ## **4.2 Implementation**
 
-The application uses FastAPI and a single HTML page containing CSS and JavaScript. FastAPI serves both the page and the JSON API from the same address. The page includes a textbox, a character counter, a Publish button, and a feed displaying the newest post first.
+FastAPI serves one HTML page containing CSS and JavaScript. The page has a textbox, character counter, Publish button, and newest-first feed.
 
-`POST /posts` accepts a JSON object containing a string `body`. The backend trims surrounding whitespace and checks that the result contains 1–2,000 Unicode code points. It then assigns an integer `post_id`, starting at 1, and appends the post to an in-memory Python list. Only successful creations consume an ID. The response uses HTTP `201` and returns the ID and trimmed body.
+The browser sends `body` to `POST /posts`. The backend trims outer whitespace, checks the 1–2,000-code-point limit, assigns `post_id`, and stores the post in a Python list. Success returns `201`. `GET /posts` returns the list newest first with `200`. Invalid input returns `422` with the contract's exact message. Rejected requests consume no ID.
 
-`GET /posts` returns HTTP `200` and the posts in descending ID order. An empty list returns `[]`. The backend stores only `post_id` and `body`; it does not store users, audiences, or other fields from the planned data model.
+The backend decides whether text is valid. Both sides count Unicode code points; some visible emoji contain several. `textContent` displays HTML-like input as text, so it cannot become page markup.
 
-FastAPI validates the request structure before the create route runs. A custom `RequestValidationError` handler maps framework validation errors to the exact messages specified in the contract. The route handles empty or over-limit trimmed text. Both paths return HTTP `422` with a string `detail`.
-
-The browser sends the entered text using `fetch`. It disables Publish while the request is pending, clears the textbox after success, and retrieves the updated feed. A validation failure preserves the input and displays the backend's message. A network failure is reported as an unconfirmed request, because a lost response does not prove that the backend failed to create the post. A successful creation followed by a failed feed refresh has a separate message.
-
-The frontend counts code points with `Array.from(text.trim()).length`; the backend uses Python's `len()` after trimming and is authoritative. A simple emoji such as 😀 is one code point, although some visible emoji contain several code points. Feed content is inserted with `textContent`, so HTML-like input is displayed as text rather than interpreted as markup.
+Publish is disabled while saving. Success clears the input and reloads the feed. Validation failures preserve the input. A lost network response leaves the result uncertain; a successful save followed by a failed feed refresh has a separate message.
 
 ## **4.3 Verification**
 
-The automated suite in `poc/tests/test_posts.py` contains 28 passing test cases. It checks creation and retrieval, every documented validation error, trimming, preservation of internal whitespace, newest-first ordering, and ID behaviour. Boundary tests accept exactly 2,000 code points and reject 2,001, including emoji inputs. The suite also checks that the page is served and that HTML-like input is stored unchanged.
+The recorded automated run passed 28 tests covering the contract's valid and invalid inputs, trimming, IDs, ordering, and the 2,000/2,001 boundaries, including emoji. GitHub Actions also passed on the branch, PR, and merged `main`.
 
-GitHub Actions runs the suite on Python 3.13. Successful runs were recorded for the feature-branch push and PR at commit `c48f332`, and for `main` after the merge at `bd56619`:
-
-- [Feature-branch checks](https://github.com/lum-afk/Campus-Social-Network-Project/actions/runs/38594017193)
-- [Pull-request checks](https://github.com/lum-afk/Campus-Social-Network-Project/actions/runs/38594017665)
-- [Checks after merging to main](https://github.com/lum-afk/Campus-Social-Network-Project/actions/runs/38594983200)
-
-These tests exercise the API and page response; they do not execute the page's JavaScript. The implementation record in [PR #1](https://github.com/lum-afk/Campus-Social-Network-Project/pull/1) separately records browser checks for the counter, text rendering, input preservation, loading state, refresh behaviour, and failure messages. The README provides the steps to reproduce the demonstration. No production load, uptime, usability-study, or full accessibility compliance result is claimed for this PoC.
+These tests check the API and page response, not execution of browser JavaScript. [PR #1](https://github.com/lum-afk/Campus-Social-Network-Project/pull/1) records separate browser checks. The README explains how to repeat the demonstration. No production performance or full accessibility result is claimed.
 
 ## **4.4 Simplifications and limitations**
 
-| Planned Assignment 2 system | Implemented Assignment 1 PoC |
+| Planned system | PoC |
 | ----- | ----- |
-| React frontend and rich-text editor | One HTML/CSS/JavaScript page with plain text |
-| PostgreSQL and the full relational model | A Python list containing post IDs and bodies |
-| Verified users, ownership, and audiences | No login or access checks; fictional local data |
-| Modular components C1–C7 | One small FastAPI module demonstrating posting |
-| WebSocket draft collaboration | Ordinary HTTP requests for posts |
-| Communities, likes, comments, moderation, appeals, and AI | Not implemented |
+| React and rich text | HTML/CSS/JavaScript and plain text |
+| PostgreSQL | Temporary Python list |
+| Verified users and audience controls | No login or permissions |
+| C1–C7 and WebSocket collaboration | One small backend using HTTP |
+| Communities, moderation, and AI | Omitted |
 
-The list survives browser refreshes while the same backend process is running. Restarting that process deletes all posts and resets the IDs. The PoC is intended for one local backend process: multiple worker processes would have separate lists and would not provide a shared feed. Development auto-reload can also restart the process when source files change.
+Browser refresh preserves posts while the backend runs. Restarting it clears posts and resets IDs. The PoC uses one process because separate processes would have separate lists.
 
-The three-minute demonstration follows the README: show the empty feed, publish trimmed text and a second post, show newest-first ordering and literal HTML-like input, reject whitespace-only input, refresh the browser, and restart the backend to show the storage limitation. This is a demonstration plan, not a claim that every team member has completed a timed rehearsal.
+The demo plan has a three-minute limit: show an empty feed; publish two posts; show trimming, newest-first order, and literal HTML; reject whitespace-only input; refresh; then restart to show data loss. A timed rehearsal has not been recorded.
 
 ## **4.5 Development record and AI assistance**
 
-Development used `feature/poc-posts`, with separate commits for the approved contract, implementation and tests, documentation, and automated checks. PR #1 was merged into `main` on 14 October 2026, preserving those commits.
+Development used `feature/poc-posts`, with separate commits for the contract, code/tests, documentation, and CI. PR #1 was merged into `main` on 14 October 2026, preserving those commits.
 
-Claude Code assisted with the implementation plan, code, tests, and README. Codex assisted with repository setup, CI configuration, workflow documentation, and this report draft. AI assistance is identified in the commit messages and PR description. Passing tests and AI review do not constitute a teammate's review or establish that every student understands the implementation.
+Claude Code assisted with the plan, code, tests, and README. Codex assisted with repository setup, CI, workflow documentation, and the report. Commits and the PR identify AI assistance. The team remains responsible for reviewing and understanding the work.
+
+PR #1 was merged before any teammate review. A post-merge review was requested from @lum-afk.

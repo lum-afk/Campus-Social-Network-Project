@@ -2,53 +2,42 @@
 
 ## **4.1 Purpose and scope**
 
-The Sila proof of concept demonstrates how a browser communicates with a Python backend to create and retrieve posts. It implements the creation and retrieval portion of FR-03 using fictional content. The application is a local demonstration, with no authentication or audience controls. It does not claim to implement the full planned campus social network.
-
-The submitted interface specification is `docs/contracts/poc-posts.md`, summarized in Section 2.4. The implementation is in `poc/`, with setup, execution, tests, and a demonstration checklist in `poc/README.md`.
+The PoC demonstrates a browser creating and retrieving posts through a Python backend. It covers part of FR-03 using fictional data. The code is in `poc/`; `poc/README.md` explains setup, execution, tests, and the demonstration. Section 2.4.1 describes the implemented contract.
 
 ## **4.2 Implementation**
 
-The application uses FastAPI and a single HTML page containing CSS and JavaScript. FastAPI serves both the page and the JSON API from the same address. The page includes a textbox, a character counter, a Publish button, and a feed displaying the newest post first.
+FastAPI serves one HTML page containing CSS and JavaScript. The page has a textbox, character counter, Publish button, and newest-first feed.
 
-`POST /posts` accepts a JSON object containing a string `body`. The backend trims surrounding whitespace and checks that the result contains 1–2,000 Unicode code points. It then assigns an integer `post_id`, starting at 1, and appends the post to an in-memory Python list. Only successful creations consume an ID. The response uses HTTP `201` and returns the ID and trimmed body.
+The browser sends `body` to `POST /posts`. The backend trims outer whitespace, checks the 1–2,000-code-point limit, assigns `post_id`, and stores the post in a Python list. Success returns `201`. `GET /posts` returns the list newest first with `200`. Invalid input returns `422` with the contract's exact message. Rejected requests consume no ID.
 
-`GET /posts` returns HTTP `200` and the posts in descending ID order. An empty list returns `[]`. The backend stores only `post_id` and `body`; it does not store users, audiences, or other fields from the planned data model.
+The backend decides whether text is valid. Both sides count Unicode code points; some visible emoji contain several. `textContent` displays HTML-like input as text, so it cannot become page markup.
 
-FastAPI validates the request structure before the create route runs. A custom `RequestValidationError` handler maps framework validation errors to the exact messages specified in the contract. The route handles empty or over-limit trimmed text. Both paths return HTTP `422` with a string `detail`.
-
-The browser sends the entered text using `fetch`. It disables Publish while the request is pending, clears the textbox after success, and retrieves the updated feed. A validation failure preserves the input and displays the backend's message. A network failure is reported as an unconfirmed request, because a lost response does not prove that the backend failed to create the post. A successful creation followed by a failed feed refresh has a separate message.
-
-The frontend counts code points with `Array.from(text.trim()).length`; the backend uses Python's `len()` after trimming and is authoritative. A simple emoji such as 😀 is one code point, although some visible emoji contain several code points. Feed content is inserted with `textContent`, so HTML-like input is displayed as text rather than interpreted as markup.
+Publish is disabled while saving. Success clears the input and reloads the feed. Validation failures preserve the input. A lost network response leaves the result uncertain; a successful save followed by a failed feed refresh has a separate message.
 
 ## **4.3 Verification**
 
-The automated suite in `poc/tests/test_posts.py` contains 28 passing test cases. It checks creation and retrieval, every documented validation error, trimming, preservation of internal whitespace, newest-first ordering, and ID behaviour. Boundary tests accept exactly 2,000 code points and reject 2,001, including emoji inputs. The suite also checks that the page is served and that HTML-like input is stored unchanged.
+The recorded automated run passed 28 tests covering the contract's valid and invalid inputs, trimming, IDs, ordering, and the 2,000/2,001 boundaries, including emoji. GitHub Actions also passed on the branch, PR, and merged `main`.
 
-GitHub Actions runs the suite on Python 3.13. Successful runs were recorded for the feature-branch push and PR at commit `c48f332`, and for `main` after the merge at `bd56619`:
-
-- [Feature-branch checks](https://github.com/lum-afk/Campus-Social-Network-Project/actions/runs/38594017193)
-- [Pull-request checks](https://github.com/lum-afk/Campus-Social-Network-Project/actions/runs/38594017665)
-- [Checks after merging to main](https://github.com/lum-afk/Campus-Social-Network-Project/actions/runs/38594983200)
-
-These tests exercise the API and page response; they do not execute the page's JavaScript. The implementation record in [PR #1](https://github.com/lum-afk/Campus-Social-Network-Project/pull/1) separately records browser checks for the counter, text rendering, input preservation, loading state, refresh behaviour, and failure messages. The README provides the steps to reproduce the demonstration. No production load, uptime, usability-study, or full accessibility compliance result is claimed for this PoC.
+These tests check the API and page response, not execution of browser JavaScript. [PR #1](https://github.com/lum-afk/Campus-Social-Network-Project/pull/1) records separate browser checks. The README explains how to repeat the demonstration. No production performance or full accessibility result is claimed.
 
 ## **4.4 Simplifications and limitations**
 
-| Planned Assignment 2 system | Implemented Assignment 1 PoC |
+| Planned system | PoC |
 | ----- | ----- |
-| React frontend and rich-text editor | One HTML/CSS/JavaScript page with plain text |
-| PostgreSQL and the full relational model | A Python list containing post IDs and bodies |
-| Verified users, ownership, and audiences | No login or access checks; fictional local data |
-| Modular components C1–C7 | One small FastAPI module demonstrating posting |
-| WebSocket draft collaboration | Ordinary HTTP requests for posts |
-| Communities, likes, comments, moderation, appeals, and AI | Not implemented |
+| React and rich text | HTML/CSS/JavaScript and plain text |
+| PostgreSQL | Temporary Python list |
+| Verified users and audience controls | No login or permissions |
+| C1–C7 and WebSocket collaboration | One small backend using HTTP |
+| Communities, moderation, and AI | Omitted |
 
-The list survives browser refreshes while the same backend process is running. Restarting that process deletes all posts and resets the IDs. The PoC is intended for one local backend process: multiple worker processes would have separate lists and would not provide a shared feed. Development auto-reload can also restart the process when source files change.
+Browser refresh preserves posts while the backend runs. Restarting it clears posts and resets IDs. The PoC uses one process because separate processes would have separate lists.
 
-The three-minute demonstration follows the README: show the empty feed, publish trimmed text and a second post, show newest-first ordering and literal HTML-like input, reject whitespace-only input, refresh the browser, and restart the backend to show the storage limitation. This is a demonstration plan, not a claim that every team member has completed a timed rehearsal.
+The demo plan has a three-minute limit: show an empty feed; publish two posts; show trimming, newest-first order, and literal HTML; reject whitespace-only input; refresh; then restart to show data loss. A timed rehearsal has not been recorded.
 
 ## **4.5 Development record and AI assistance**
 
-Development used `feature/poc-posts`, with separate commits for the approved contract, implementation and tests, documentation, and automated checks. PR #1 was merged into `main` on 14 October 2026, preserving those commits.
+Development used `feature/poc-posts`, with separate commits for the contract, code/tests, documentation, and CI. PR #1 was merged into `main` on 14 October 2026, preserving those commits.
 
-Claude Code assisted with the implementation plan, code, tests, and README. Codex assisted with repository setup, CI configuration, workflow documentation, and this report draft. AI assistance is identified in the commit messages and PR description. Passing tests and AI review do not constitute a teammate's review or establish that every student understands the implementation.
+Claude Code assisted with the plan, code, tests, and README. Codex assisted with repository setup, CI, workflow documentation, and the report. Commits and the PR identify AI assistance. The team remains responsible for reviewing and understanding the work.
+
+PR #1 was merged before any teammate review. A post-merge review was requested from @lum-afk.

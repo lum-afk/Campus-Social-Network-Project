@@ -1,13 +1,14 @@
 flowchart LR
     U[Students, organizers, moderators, administrators]
-    subgraph HOST[Proposed Linux host - one university]
-        WEB[TLS reverse proxy and React static build]
-        API[FastAPI - one worker - C1 to C7]
-        DB[(PostgreSQL persistent volume)]
-        WEB -->|HTTP and WebSocket proxy| API
-        API -->|Private database connection| DB
+    subgraph SILA[Planned Sila system - one university]
+        WEB[WEB - React frontend]
+        subgraph SERVER[One planned server]
+            API[API - one FastAPI process - C1 to C7]
+            DB[(DB - PostgreSQL)]
+        end
+        WEB -->|HTTPS requests and WebSocket saved updates| API
+        API -->|Read and save linked records| DB
     end
-    U -->|HTTPS and WSS - same origin| WEB
-    API -->|HTTPS verification adapter| EMAIL[Approved email provider - selection pending]
-    API -->|HTTPS authorized discussion only| AI[Approved AI provider - disabled until approved]
-    DB -.->|Daily encrypted backup job| BACKUP[Separate backup storage - seven daily copies]
+    U -->|Use through a browser| WEB
+    API -->|HTTPS - verification address and link| EMAIL[External email service - not connected]
+    API -->|HTTPS - permitted discussion and summary| AI[External AI service - not connected]
