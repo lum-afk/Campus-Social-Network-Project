@@ -42,7 +42,7 @@ The server sanitizes rich text by removing unsafe markup before storing it. Post
 
 ### **2.2.4 Deployment and external services**
 
-The plan uses one server running one FastAPI process so WebSocket updates share memory; more processes would need shared messaging.
+The plan uses one server running one FastAPI process so WebSocket updates share memory; more processes would need shared messaging. OPS covers health checks, daily database backups, and restore procedures, supporting NFR-03 and NFR-04.
 
 Email verifies accounts. AI summarizes only content the requester may access, and its result is labelled AI-generated. Failure leaves the discussion unchanged. Secrets stay in backend environment variables.
 

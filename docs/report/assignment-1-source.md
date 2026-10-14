@@ -282,16 +282,14 @@ The draft was checked for coverage, testability, and consistency. The review ide
 * A different moderator reviews an appeal. It escalates when independent review is unavailable or university policy is involved.  
 * AI summarizes authorized published discussions on request. Drafts and hidden content are excluded.
 
-The appeal workflow and proposed technical design require team confirmation before submission.
-
 ### **Open Questions**
 
 | Question | Owner |
 | ----- | ----- |
 | Which university domains will be accepted? | University administrator |
 | Is external AI processing permitted? | University policy owner |
-| Which hosting, email provider, and permitted AI provider/model will be used? | Coder with university approval |
-| Who will configure monitoring, backups, and restoration to meet Section 1.3 targets? | Team and university deployment owner |
+| Which hosting provider, email provider, and permitted AI provider will be used? (The main technologies are chosen in Section 2.2.) | Coder, with university approval |
+| How will monitoring, backups, and restoration be set up? | Coder or deployment owner |
 
 ### **Architecture Identifiers**
 
@@ -399,7 +397,7 @@ The server sanitizes rich text by removing unsafe markup before storing it. Post
 
 ### **2.2.4 Deployment and external services**
 
-The plan uses one server running one FastAPI process so WebSocket updates share memory; more processes would need shared messaging.
+The plan uses one server running one FastAPI process so WebSocket updates share memory; more processes would need shared messaging. OPS covers health checks, daily database backups, and restore procedures, supporting NFR-03 and NFR-04.
 
 Email verifies accounts. AI summarizes only content the requester may access, and its result is labelled AI-generated. Failure leaves the discussion unchanged. Secrets stay in backend environment variables.
 
@@ -657,8 +655,6 @@ The backend checks permissions; database keys and constraints prevent broken lin
 **Decision:** C7 selects permitted content, calls the provider, checks the response, and handles failures.
 
 **Consequences:** Supports mocks and provider replacement. Accuracy is not guaranteed, and external processing requires university permission.
-
-**Status:** These are planned Assignment 2 decisions for team review. Hosting, providers, and university permissions remain open. They are not implemented in the PoC.
 
 ---
 
