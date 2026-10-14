@@ -16,11 +16,10 @@ WebSockets, LLM). It is context, not the scope of this proof of concept.
 ## Commands (macOS, from poc/)
 Python 3.13 is available. The virtual environment is already created.
 - Activate: source .venv/bin/activate
-- Install, once requirements.txt exists: python -m pip install -r requirements.txt
-- Run, once app/main.py exists: python -m uvicorn app.main:app --reload
+- Install: python -m pip install -r requirements.txt
+- Run: python -m uvicorn app.main:app --reload
 - Open: http://127.0.0.1:8000
-- Test, once tests exist: python -m pytest
-These application paths are provisional; update them to match the final code.
+- Test: python -m pytest
 
 ## Git and workflow
 - Use one local feature branch; do not create a worktree.
