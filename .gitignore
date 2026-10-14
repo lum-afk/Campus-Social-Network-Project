@@ -1,0 +1,13 @@
+# Local Python artifacts
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+# Secrets and machine-local settings
+.env
+.env.*
+!.env.example
+.claude/settings.local.json
+.DS_Store
