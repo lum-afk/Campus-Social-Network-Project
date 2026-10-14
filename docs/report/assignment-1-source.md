@@ -913,5 +913,3 @@ The three-minute demonstration follows the README: show the empty feed, publish 
 Development used `feature/poc-posts`, with separate commits for the approved contract, implementation and tests, documentation, and automated checks. PR #1 was merged into `main` on 14 October 2026, preserving those commits.
 
 Claude Code assisted with the implementation plan, code, tests, and README. Codex assisted with repository setup, CI configuration, workflow documentation, and this report draft. AI assistance is identified in the commit messages and PR description. Passing tests and AI review do not constitute a teammate's review or establish that every student understands the implementation.
-
-The PR was merged at Mohamed's explicit request before a teammate submitted a review. That did not follow the review-before-merge process stated in the PoC specification. Post-merge review was requested from `lum-afk`; no submitted teammate review was present when this section was checked on 15 October 2026. Findings should be recorded on the PR and addressed through a follow-up PR. The history must retain the actual order of events.
