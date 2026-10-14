@@ -333,7 +333,7 @@ The draft was checked for coverage, testability, and consistency. The review ide
 
 **Scope Clarification**
 
-Multiple universities sharing one deployment are outside scope. The existing feature exclusions remain unchanged..
+Multiple universities sharing one deployment are outside scope. The existing feature exclusions remain unchanged.
 
 ---
 
