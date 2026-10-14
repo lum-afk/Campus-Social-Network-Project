@@ -1,4 +1,4 @@
-<!-- Working report text based on the 2026-10-14 Google Doc export. Sections 2.4 and 2.5 updated and Section 4 added locally on 2026-10-15; other sections retain the source wording. Diagram images are not included in this text export. Original: https://docs.google.com/document/d/1BZzcQYcdMwUVwqeCP_boOUC6ZeL1ItNhos_O01MjAJY/edit -->
+<!-- Working report text based on the 2026-10-14 Google Doc export. Sections 2.2, 2.4, 2.5, and 2.6 updated and Section 4 added locally on 2026-10-15. Related open questions and ADR wording aligned with the proposed baseline. Original diagram images are not included; new supporting Mermaid sources are in docs/diagrams/. Original: https://docs.google.com/document/d/1BZzcQYcdMwUVwqeCP_boOUC6ZeL1ItNhos_O01MjAJY/edit -->
 
 # **Sila (صِلة)**
 
@@ -290,8 +290,8 @@ The appeal workflow and proposed technical design require team confirmation befo
 | ----- | ----- |
 | Which university domains will be accepted? | University administrator |
 | Is external AI processing permitted? | University policy owner |
-| Which hosting, authentication, editor, email, and AI services will be used? | Coder |
-| How will monitoring, backups, and restoration be configured? | Coder or deployment owner |
+| Which deployment account/domain, email provider, and permitted AI provider/model will be used? The database, editor, and authentication baseline is specified in Section 2.2. | Coder with university approval |
+| Who will operate the monitoring and backup plan in Section 2.2, and approve production retention in Section 2.6? | Team and university deployment owner |
 
 ### **Architecture Identifiers**
 
@@ -345,7 +345,7 @@ Multiple universities sharing one deployment are outside scope. The existing fea
 
 The following requirements have the greatest influence on Sila’s design.
 
-| Rank | Driver | Design Response                      Design Response |
+| Rank | Driver | Design Response |
 | :---- | :---- | :---- |
 | 1 | Security and privacy | Check identity, roles, ownership, membership, and audience in the backend. |
 | 2 | Safe collaboration | Use draft-version checks to prevent silent overwrites and WebSockets to distribute saved updates. |
@@ -353,53 +353,59 @@ The following requirements have the greatest influence on Sila’s design.
 | 4 | Required technologies and manageable development | Use React, FastAPI, WebSockets, and an LLM integration within one modular backend. |
 | 5 | Performance and reliability | Use indexed queries, testing, monitoring, backups, and restoration procedures. |
 
-One backend divided into modules keeps development and deployment manageable. PostgreSQL is proposed because Sila’s records have relationships and draft saves require reliable transactions.
+One backend divided into modules keeps development and deployment manageable. The proposed Assignment 2 baseline selects PostgreSQL because Sila’s records have relationships and draft saves require reliable transactions.
 
 ## **2.2 System Design**
 
-The architecture uses three C4 diagrams.
+The Assignment 2 design uses a React frontend, one modular FastAPI backend, and PostgreSQL. The choices below form the proposed implementation baseline for team review. The current Assignment 1 application remains the smaller plain-text PoC described in Sections 2.4 and 4; it has no database, authentication, rich-text editor, WebSockets, or AI integration.
 
-**System Context Diagram**
+### **2.2.1 Context and containers**
 
-Sila serves students, community organizers, moderators, and administrators. Each deployment serves one university with configurable approved email domains. External email and AI services support verification and discussion summaries.**![][image1]**
+Sila serves students, community organizers, moderators, and administrators at one university per deployment. Approved university email domains are configuration values. Email verifies account ownership; an external AI service supplies summaries only when university policy permits processing the selected discussion.
 
-[**https\://canva.link/mnbu5ng6gg0l7hs**](https://canva.link/mnbu5ng6gg0l7hs)
-
-**Container Diagram**
-
-| Container | Technology | Responsibility |
+| Container | Selected design | Responsibility |
 | ----- | ----- | ----- |
-| WEB | React | Forms, audience selection, rich-text editing, and live-update display |
-| API | Python/FastAPI | Permissions, business rules, HTTP requests, and WebSocket connections |
-| DB | Proposed PostgreSQL | Persistent user, community, content, and moderation records |
+| WEB | React with the Tiptap editor | Pages, forms, audience selection, rich-text editing, and display of saved draft updates |
+| API | Python/FastAPI, components C1–C7 | Authentication, authorization, business rules, HTTP endpoints, and WebSocket connections |
+| DB | PostgreSQL, accessed through SQLAlchemy; Alembic migrations | Persistent records, constraints, and transactions |
 
-WEB communicates with API through HTTPS and secure WebSockets. API accesses DB and calls the email and AI services. Provider credentials remain on the backend.
+The browser and API share one HTTPS origin. A reverse proxy serves the React build and forwards `/api/v1/` requests, including secure WebSocket connections, to FastAPI. Only the backend accesses PostgreSQL and external service credentials. Database access is private to the deployment network.
 
-React, FastAPI, WebSockets, rich-text capabilities, and an LLM integration meet Assignment 2’s technology constraints
+The existing context, container, and component figures are maintained in [the team's Canva design](https://canva.link/mnbu5ng6gg0l7hs). They must use the WEB/API/DB and C1–C7 names above. The text export lacks those images. The new editable deployment diagram in `docs/diagrams/assignment-2-deployment.mmd` supplements the figures; it does not replace their original editable sources.
 
-**![][image2]**
-
-[**https\://canva.link/mnbu5ng6gg0l7hs**](https://canva.link/mnbu5ng6gg0l7hs)
-
-**Component Diagram**
+### **2.2.2 Backend components**
 
 | Component | Responsibility |
 | ----- | ----- |
 | C1: HTTP and WebSocket Gateway | Validate and route requests and events |
-| C2: Identity and Access Control | Check accounts, roles, ownership, membership, and audiences |
+| C2: Identity and Access Control | Check accounts, global roles, ownership, membership, and audiences |
 | C3: Community Management | Manage communities, membership, and official status |
 | C4: Publishing and Interaction | Manage posts, comments, likes, and content validation |
-| C5: Draft Collaboration | Manage draft versions, publishing, and live updates |
+| C5: Draft Collaboration | Manage draft versions, publication, and saved-update notifications |
 | C6: Moderation and Appeals | Manage reports, decisions, appeals, and audit records |
-| C7: AI Integration | Prepare authorized input, call the provider, and check responses |
+| C7: AI Integration | Collect authorized discussion text, call the provider, and validate results |
 
-These components run within one FastAPI application and access the database through repositories.
+These are modules within one application. Services own business transactions; repositories perform database operations within those transactions. C2 checks permissions for HTTP actions, WebSocket subscriptions, saves, and delivery of protected updates.
 
-**![][image3]**
+### **2.2.3 Authentication and rich text**
 
-[**https\://canva.link/mnbu5ng6gg0l7hs**](https://canva.link/mnbu5ng6gg0l7hs)
+Authentication will use university email verification, passwords hashed with Argon2 through `pwdlib`, and opaque server-side sessions stored in PostgreSQL. This avoids adding a separate identity provider to the initial implementation. The password-hashing library choice follows [FastAPI's password-hashing guidance](https://fastapi.tiangolo.com/tutorial/security/oauth2-jwt/); Sila's proposed session mechanism does not use that tutorial's JWT flow.
 
-**Coder Task:** Confirm the database, editor, authentication, hosting, and provider choices. Keep the diagrams consistent with the final design.
+Each login generates a fresh random session token. The database stores its hash; the browser receives it in a `Secure`, `HttpOnly`, `SameSite=Lax` cookie. State-changing requests require CSRF protection and origin checks. WebSocket handshakes check the origin and session; expiry, logout, or lost permissions stop further protected actions and updates. Proposed defaults are a 30-minute idle timeout, a 12-hour absolute session lifetime, and a 30-minute single-use email verification token. Login, registration, and resend attempts are rate limited. These controls follow [OWASP's session-management guidance](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html).
+
+Tiptap will expose paragraphs, bold, italic, lists, line breaks, and links. Its HTML output fits the `body` string in the proposed interfaces. C4 sanitizes incoming HTML with `nh3`, allowing only the corresponding tags and safe HTTP/HTTPS links; scripts, event handlers, styles, images, and embeds are excluded. Only sanitized HTML is stored and rendered. Both libraries support these capabilities: [Tiptap content formats](https://tiptap.dev/docs/guides/output-json-html) and [nh3 allowlists](https://nh3.readthedocs.io/en/stable/index.html).
+
+For validation, C4 extracts text from the sanitized HTML, decodes entities, represents line breaks and block boundaries as newlines, trims outer whitespace, and counts Unicode code points. A published post must contain 1–2,000 code points. Drafts may be empty while being prepared but cannot publish empty. Comments use plain text with a 1–500 code-point limit. Shared fixtures will keep the browser counter consistent with backend validation. Collaboration uses the versioned save protocol in Section 2.4, with manual conflict resolution.
+
+### **2.2.4 Deployment and external services**
+
+The initial deployment target is one Linux host with a TLS reverse proxy, one FastAPI worker, and PostgreSQL on a persistent volume. A single worker allows connected draft clients to share the same in-process broadcast registry. Database transactions remain authoritative; clients retrieve the latest snapshot after reconnecting. Scaling to multiple workers requires shared event distribution and is a later change.
+
+OPS will collect health checks, error counts, request latency, and connection failures without logging passwords, tokens, or discussion bodies. The proposed backup plan is a daily encrypted database backup to separate storage, seven daily copies, and a restore rehearsal before demonstration. Section 1.3's availability and recovery figures remain targets until measured; this single-host design provides no automatic failover.
+
+Email and AI use backend HTTPS adapters with timeouts and mocked responses for development. Live service selection requires an approved account, budget, and university data-handling permission. Until those are available, verification delivery is simulated in development and the live AI feature remains disabled. A mock summary must be labelled as a test response. No hosting subscription, email delivery, or live AI integration is claimed by this report.
+
+The remaining external decisions are the deployment account/domain, approved university email domains, email provider, and permitted AI provider/model. The application structure, database, editor, authentication approach, and migration approach above can proceed without inventing those approvals.
 
 ## **2.3 Behaviour and Design Decisions**
 
@@ -545,7 +551,7 @@ If the submission cannot be confirmed because of a network failure, the page tel
 
 The planned React frontend communicates with C1, the FastAPI HTTP and WebSocket Gateway, using HTTPS and JSON. The proposed routes use `/api/v1` to distinguish them from the simplified PoC routes. C2 checks the authenticated identity, verification state, roles, ownership, membership, and audience before the appropriate component performs an operation. Client-supplied IDs never establish permission.
 
-The proposed session design uses an opaque session identifier in a `Secure`, `HttpOnly`, `SameSite` cookie. State-changing browser requests also require CSRF protection and origin validation. Login establishes a session; logout invalidates it. Registration, verification, and login remain accessible without an existing session. Account-provider selection and deployment details are separate implementation decisions for Assignment 2.
+The proposed session design uses an opaque session identifier in a `Secure`, `HttpOnly`, `SameSite=Lax` cookie. State-changing browser requests also require CSRF protection and origin validation. Login establishes a session; logout invalidates it. Registration, verification, and login remain accessible without an existing session. Section 2.2 specifies backend-managed accounts, password hashing, session lifetimes, and the deployment baseline; live email and AI providers still require selection and approval.
 
 Successful reads and updates use `200`, creations use `201`, accepted asynchronous operations use `202`, and successful deletions without a response body use `204`. Errors use a JSON object with a string `detail`: `401` for missing or invalid authentication, `403` for a known operation the user cannot perform, `404` for an unavailable resource, `409` for a conflicting state, and `422` for invalid input. Resource lookups use `404` where revealing that restricted content exists would disclose information. Unexpected internal failures return a generic `500` without credentials, database errors, or stack traces.
 
@@ -618,73 +624,96 @@ The current repository contains the Assignment 1 proof of concept, its contract,
 | `docs/contracts/poc-posts.md` | Approved PoC interface specification |
 | `docs/report/assignment-1-source.md` | Working report text based on the Google Doc export |
 | `docs/report/section-*.md` | Individual report sections for review and transfer to the shared report |
+| `docs/diagrams/` | New Mermaid sources for the proposed deployment and data relationships, with a scope README |
 | `.github/workflows/poc-tests.yml` | GitHub Actions contract-test workflow |
 | `CLAUDE.md` | Project scope, commands, and AI-assisted workflow instructions |
 | `.gitignore` | Excludes local environments, caches, credentials, and personal settings |
 
-The local Python environment at `poc/.venv/` and personal Claude settings are not committed. The report text export does not contain the original diagram images; editable diagram sources and the final report PDF remain submission deliverables.
+The local Python environment at `poc/.venv/` and personal Claude settings are not committed. The report text export does not contain the original diagram images. The new Mermaid sources supplement the design; the original Canva sources and a final PDF containing readable figures remain submission deliverables.
+
+`poc/requirements.txt` pins FastAPI, Uvicorn, pytest, and httpx2. The existing GitHub Actions workflow runs the PoC tests on Python 3.13 for PRs targeting `main` and pushes to `main` or `feature/poc-posts`. It does not build a React application, provision PostgreSQL, or test the proposed Assignment 2 system.
 
 **Planned Assignment 2 structure**
 
 | Planned location | Responsibility |
 | ----- | ----- |
-| `frontend/` | React pages, forms, editor, and WebSocket client |
+| `frontend/` | React pages, forms, Tiptap editor, and WebSocket client |
 | `backend/app/api/` | HTTP routes and WebSocket gateway |
 | `backend/app/services/` | Business components C2–C7 |
-| `backend/app/models/` | Database models and constraints |
+| `backend/app/models/` | SQLAlchemy PostgreSQL models and constraints |
 | `backend/app/repositories/` | Database access and transaction operations |
+| `backend/app/integrations/` | Email and AI HTTPS adapters, with development mocks |
+| `backend/app/core/` | Settings, session handling, and shared security helpers |
+| `backend/migrations/` | Reviewed Alembic schema revisions |
 | `backend/tests/` and `frontend/tests/` | Component and integration tests |
-| `docs/diagrams/` | Editable architecture diagrams and exports |
+| `docs/diagrams/` | Additional editable architecture figures and final exports alongside the existing Mermaid sources |
 | `docs/contracts/` | HTTP and WebSocket specifications |
 | `docs/adr/` | Architecture decision records |
-| `config/` and `.env.example` | Nonsecret configuration examples |
+| `config/` and `.env.example` | Nonsecret examples for approved domains, database connection, session/token lifetimes, provider settings, and disabled live AI by default |
+| `ops/` | Deployment, backup, restore, and monitoring procedures |
 
-These locations are a development plan, not a claim that those folders already exist. Mohammed is responsible for the current proof-of-concept implementation under the recorded team task allocation. Assignment 2 code-maintenance responsibilities will be agreed with the team and recorded in Section 3.1 before those components are developed.
+This table describes planned additions; only the locations in the current-repository table already exist. Assignment 2 will be developed alongside `poc/`, preserving the Assignment 1 contract and reproducible demonstration. Its dependency lockfiles and PostgreSQL integration checks will be added with that implementation. Mohammed is responsible for the current proof-of-concept implementation under the recorded team task allocation. Assignment 2 code-maintenance responsibilities will be agreed with the team and recorded in Section 3.1 before those components are developed.
 
 Database passwords, session secrets, email credentials, and AI keys must remain in backend environment variables or a secret manager. They must not appear in repository files or browser code. Configuration examples contain placeholders only.
 
 ## **2.6 Data Model**
 
-## The ER diagram shows the records needed to support Sila’s features and policies.
+The implemented PoC stores a Python list of records containing only integer `post_id` and string `body`. IDs start at 1 and the list disappears when the process restarts. The relational model below is the proposed Assignment 2 design; no tables or migrations currently exist in the application.
 
-## **![][image5]**
+### **2.6.1 Types and records**
 
-## **![][image6]**
+PostgreSQL entity IDs use `BIGINT GENERATED ALWAYS AS IDENTITY` primary keys. Foreign keys use `BIGINT`; timestamps use `TIMESTAMPTZ` with UTC values; free text uses `TEXT`. Status and role values use `TEXT` with `CHECK` constraints. Fields are required unless marked nullable. Each main entity has `created_at`; mutable entities also have `updated_at`. API identifiers retain Section 2.4's names, such as `post_id`, rather than changing the PoC contract.
 
-**![][image7]**
-
-[**https\://canva.link/mnbu5ng6gg0l7hs**](https://canva.link/mnbu5ng6gg0l7hs)
-
-| Entity | Purpose |
+| Record | Principal fields and relationships |
 | ----- | ----- |
-| User | Store verified accounts and global roles |
-| Community | Store community information, visibility, and official status |
-| Membership | Connect users and communities with membership status and role |
-| Post | Store published content, author, audience, and visibility status |
-| Draft | Store shared content, version, and publication state |
-| Comment | Store comments associated with posts |
-| Like | Store one active like per user and post |
-| OfficialRequest | Store official-community requests and review outcomes |
-| Report | Store reports against posts or comments |
-| Decision | Store initial moderation decisions |
-| Appeal | Store appeals and their outcomes |
-| AuditRecord | Store moderation and appeal action history |
+| User (`users`) | `user_id`; unique normalized `email`; `password_hash`; nullable `verified_at`; `global_role` (student/moderator/admin); `status` (active/disabled) |
+| Community | `community_id`; `created_by` → User; `name`; `visibility` (open/restricted); `is_official BOOLEAN` |
+| Membership | Composite primary key (`community_id`, `user_id`), referencing Community and User; `role` (member/organizer); `status` (pending/approved/rejected) |
+| Post | `post_id`; `author_id` → User; nullable `community_id` → Community; sanitized HTML `body`; `audience` (university/community); independent nullable `hidden_at` and `deleted_at` |
+| Draft | `draft_id`; `community_id` → Community; `created_by` and `updated_by` → User; sanitized HTML `body`; positive `version INTEGER`; nullable unique `published_post_id` → Post; nullable `published_at` |
+| Comment | `comment_id`; `post_id` → Post; `author_id` → User; plain-text `body`; independent nullable `hidden_at` and `deleted_at` |
+| Like | Composite primary key (`post_id`, `user_id`), referencing Post and User; `created_at`; unlike removes the row |
+| OfficialRequest | `request_id`; `community_id` → Community; `requested_by` → User; `reason`; `status` (pending/approved/rejected); nullable `reviewed_by` → User and `reviewed_at` |
+| Report | `report_id`; `reporter_id` → User; exactly one of nullable `post_id` → Post or `comment_id` → Comment; `reason`; protected `evidence_body` snapshot of the reported content |
+| Decision | `decision_id`; unique `report_id` → Report; `moderator_id` → User; `action` (dismiss/hide); `reason`; `decided_at` |
+| Appeal | `appeal_id`; unique `decision_id` → Decision; `appellant_id` → User; `reason`; `status` (pending/escalated/resolved); nullable `reviewer_id` → User, `outcome` (upheld/reversed), `resolution_reason`, and `resolved_at` |
+| AuditRecord | `audit_id`; `actor_id` → User; `action`; `target_type`; `target_id BIGINT`; `reason`; `occurred_at`; reference information for moderation and appeal events |
 
-**Relationships and Constraints**
+User global roles are separate from organizer roles held through Membership. `target_id` in AuditRecord is a historical reference selected by `target_type`, not a foreign key to several tables. C6 validates it when appending the record. Report's two concrete foreign keys preserve referential integrity for either supported target.
 
-* Users and communities have a many-to-many relationship through Membership.  
-* Organizer roles apply to individual communities.  
-* Communities contain posts and drafts; ordinary university-wide posts may have no community.  
-* Posts have comments and likes.  
-* Each user has at most one active like per post.  
-* Each report targets exactly one post or comment.  
-* Each report has at most one initial decision, and each decision has at most one appeal.  
-* A draft may link to one published post; the link is unique.  
-* Restricted content requires approved membership.  
-* Only affected authors may appeal within seven days.  
-* Ordinary users cannot modify audit records.
+The API derives a report's `status` from whether a Decision exists, maps an appeal's `created_at` to `submitted_at`, and maps `resolution_reason` to the resolution request's `reason`. The report request's `target_type` and `target_id` select the corresponding concrete target foreign key.
 
-**Coder Task:** Finalize field types, foreign keys, indexes, authentication support records, migrations, and retention rules.
+The supporting records complete the authentication and retry design:
+
+| Record | Fields and rules |
+| ----- | ----- |
+| Session | `session_id`; `user_id` → User; unique `token_hash`; `csrf_token_hash`; `created_at`, `last_seen_at`, `expires_at`; nullable `revoked_at`. Raw session tokens are not stored. |
+| EmailVerification | `verification_id`; `user_id` → User; unique `token_hash`; `created_at`, `expires_at`; nullable `used_at`. Consuming a valid token and verifying the account occur in one transaction. Resending invalidates earlier outstanding tokens. |
+| DraftSaveReceipt | Composite primary key (`draft_id`, `actor_id`, `request_id`), referencing Draft and User; `request_id VARCHAR(64)`; `payload_hash`; `result_version INTEGER`; sanitized `result_body`; `created_at`. Stores the outcome of a successful save for retry detection. |
+
+The editable relationship diagram is `docs/diagrams/assignment-2-data-model.mmd`. It supplements the original [Canva ER figures](https://canva.link/mnbu5ng6gg0l7hs), which must be reconciled with these fields before the final PDF is exported.
+
+### **2.6.2 Integrity and authorization**
+
+Database primary keys, foreign keys, uniqueness, and row checks enforce structural rules. PostgreSQL row checks do not replace authorization or rules involving other records; those belong in service transactions. See [PostgreSQL's constraint documentation](https://www.postgresql.org/docs/current/ddl-constraints.html).
+
+- Membership and Like composite keys prevent duplicates. A partial unique index permits only one pending OfficialRequest per community.
+- A Report check requires exactly one target. Unique Decision.report_id and Appeal.decision_id enforce one initial decision per report and one appeal per decision.
+- A community audience requires a non-null community. C2 additionally checks membership and prevents restricted-community content from using a university audience. Changes to community visibility must preserve that restriction for existing content in the same transaction.
+- Draft versions start at 1. A save locks/checks the current draft, validates organizer access and the submitted version, updates the body and version, and inserts its receipt atomically. A repeated request ID with the same payload returns its recorded result after current authorization; a changed payload is rejected. A unique published-post link and locking the draft during publication prevent duplicate posts.
+- `published_post_id` and `published_at` are either both null or both populated. Publication checks valid nonempty content and creates the post in the same transaction. The publishing organizer is recorded as the post author.
+- Only the affected author may appeal, and only up to seven days after `decided_at`. C6 enforces the deadline and independent reviewer rule. Decision, content visibility change, and audit insertion commit together; appeal resolution likewise updates its outcome, any permitted visibility change, and audit history atomically.
+- Report snapshots preserve evidence if an author later edits the content. Hidden and author-deleted states are separate, so reversing moderation cannot restore author-deleted material. Resolving one report must not undo another active decision to hide the same content.
+
+### **2.6.3 Queries, migrations, and retention**
+
+Initial indexes support membership checks (`user_id`, `status`), community feeds (`community_id`, `created_at`, `post_id`), university feeds (`audience`, `created_at`, `post_id`), comments (`post_id`, `created_at`), drafts (`community_id`, `updated_at`), pending appeals (`status`, `created_at`), reports by each non-null target, and audit history (`target_type`, `target_id`, `occurred_at`). Token hashes are uniquely indexed; expiry timestamps support cleanup. Referencing foreign keys also receive indexes where not already covered. Query plans and representative data will determine refinements.
+
+SQLAlchemy models will live in `backend/app/models/`; reviewed Alembic revisions will live in `backend/migrations/`. Migrations will be tested against an empty database and the preceding schema before deployment, with a backup and recovery plan for destructive changes. [Alembic](https://alembic.sqlalchemy.org/en/latest/tutorial.html) manages schema revisions; it does not make a backup or prove a migration safe.
+
+The development baseline uses fictional data. Expired or consumed verification records and expired/revoked sessions are cleaned daily. Successful draft-save receipts remain for the draft's lifetime, preserving retry results. Author deletion immediately removes content from normal views and AI input; restricted evidence and audit records remain available to authorized reviewers. Account disabling revokes sessions. Foreign keys restrict deletion of referenced evidence rather than cascading away moderation history; the normal application role can insert/read audit records but cannot update/delete them.
+
+A production retention period for account data, evidence, drafts, and audits requires university approval before real student data is collected. A later approved purge must address dependent receipts, evidence, and backup expiry as well as primary records. Daily backups retain seven copies under the proposed deployment plan. AI summaries are returned on demand without a persistent summary table in this baseline.
 
 ## **2.7 Architecture Decision Records**
 
@@ -704,7 +733,7 @@ Database passwords, session secrets, email credentials, and AI keys must remain 
 
 **Options:** In-memory storage, SQLite, PostgreSQL, or a document database.
 
-**Decision:** Propose PostgreSQL for the planned application.
+**Decision:** Use PostgreSQL with SQLAlchemy models and Alembic migrations in the proposed Assignment 2 baseline. The Assignment 1 PoC retains its in-memory list.
 
 **Consequences:** Supports constraints and atomic updates; requires setup, migrations, and backups.
 
@@ -728,7 +757,7 @@ Database passwords, session secrets, email credentials, and AI keys must remain 
 
 **Consequences:** Supports mocks and provider replacement. Accuracy is not guaranteed, and external processing requires university permission.
 
-**Status:** Technical decisions require coder and team confirmation before submission.
+**Status:** Sections 2.2 and 2.6 specify the proposed technical baseline for team review before submission. Deployment accounts, provider selection, university permissions, and production retention remain external decisions; no implementation or team approval is implied.
 
 ---
 
