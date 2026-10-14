@@ -28,6 +28,10 @@ python -m pytest
 
 Use `python -m pytest` (not plain `pytest`) so that `poc/` is on the import path and the tests can import `app.main`.
 
+GitHub Actions runs this suite on Python 3.13 for pull requests into `main` and
+pushes to `main` or `feature/poc-posts`. See the PR Checks tab for the result.
+These automated API tests do not replace the browser demo or teammate review.
+
 ## Files
 
 | File | Purpose |

@@ -25,5 +25,7 @@ Python 3.13 is available. The virtual environment is already created.
 - Use one local feature branch; do not create a worktree.
 - Plan first and wait for my approval before implementation.
 - Commit only relevant files and describe AI assistance honestly.
-- Never push or open a PR; I do those myself, then request teammate review.
+- Push feature branches and create or update PRs when I explicitly request it.
+- Request teammate review before merging. Never merge or force-push without my
+  explicit instruction; an AI review does not replace teammate review.
 - Never commit secrets, local Claude settings, or the virtual environment.
