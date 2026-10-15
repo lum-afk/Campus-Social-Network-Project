@@ -1,0 +1,14 @@
+flowchart LR
+    U[Students, organizers, moderators, administrators]
+    subgraph SILA[Planned Sila system - one university]
+        WEB[WEB - React frontend]
+        subgraph SERVER[One planned server]
+            API[API - one FastAPI process - C1 to C7]
+            DB[(DB - PostgreSQL)]
+        end
+        WEB -->|HTTPS requests and WebSocket saved updates| API
+        API -->|Read and save linked records| DB
+    end
+    U -->|Use through a browser| WEB
+    API -->|HTTPS - verification address and link| EMAIL[External email service - not connected]
+    API -->|HTTPS - permitted discussion and summary| AI[External AI service - not connected]

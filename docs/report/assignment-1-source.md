@@ -1,4 +1,4 @@
-<!-- Text snapshot exported 2026-10-14 from the team Google Doc. Diagram images are not included in this text export. Original: https://docs.google.com/document/d/1BZzcQYcdMwUVwqeCP_boOUC6ZeL1ItNhos_O01MjAJY/edit -->
+<!-- Working report text based on the 2026-10-14 Google Doc export. Sections 2.2, 2.4, 2.5, 2.6, and 4 simplified locally for oral-exam preparation. Related open questions, behaviour, and ADR wording aligned with those sections. Original diagram images are not included; new supporting Mermaid sources are in docs/diagrams/. Original: https://docs.google.com/document/d/1BZzcQYcdMwUVwqeCP_boOUC6ZeL1ItNhos_O01MjAJY/edit -->
 
 # **Sila (صِلة)**
 
@@ -290,8 +290,8 @@ The appeal workflow and proposed technical design require team confirmation befo
 | ----- | ----- |
 | Which university domains will be accepted? | University administrator |
 | Is external AI processing permitted? | University policy owner |
-| Which hosting, authentication, editor, email, and AI services will be used? | Coder |
-| How will monitoring, backups, and restoration be configured? | Coder or deployment owner |
+| Which hosting, email provider, and permitted AI provider/model will be used? | Coder with university approval |
+| Who will configure monitoring, backups, and restoration to meet Section 1.3 targets? | Team and university deployment owner |
 
 ### **Architecture Identifiers**
 
@@ -345,7 +345,7 @@ Multiple universities sharing one deployment are outside scope. The existing fea
 
 The following requirements have the greatest influence on Sila’s design.
 
-| Rank | Driver | Design Response                      Design Response |
+| Rank | Driver | Design Response |
 | :---- | :---- | :---- |
 | 1 | Security and privacy | Check identity, roles, ownership, membership, and audience in the backend. |
 | 2 | Safe collaboration | Use draft-version checks to prevent silent overwrites and WebSockets to distribute saved updates. |
@@ -353,53 +353,57 @@ The following requirements have the greatest influence on Sila’s design.
 | 4 | Required technologies and manageable development | Use React, FastAPI, WebSockets, and an LLM integration within one modular backend. |
 | 5 | Performance and reliability | Use indexed queries, testing, monitoring, backups, and restoration procedures. |
 
-One backend divided into modules keeps development and deployment manageable. PostgreSQL is proposed because Sila’s records have relationships and draft saves require reliable transactions.
+One backend divided into modules keeps development and deployment manageable. The proposed Assignment 2 baseline selects PostgreSQL because Sila’s records have relationships and draft saves require reliable transactions.
 
 ## **2.2 System Design**
 
-The architecture uses three C4 diagrams.
+The planned Assignment 2 system uses React, FastAPI, and PostgreSQL. This design is separate from the smaller Assignment 1 PoC and remains subject to team review.
 
-**System Context Diagram**
+### **2.2.1 Context and containers**
 
-Sila serves students, community organizers, moderators, and administrators. Each deployment serves one university with configurable approved email domains. External email and AI services support verification and discussion summaries.**![][image1]**
+The context diagram shows students, organizers, moderators, and administrators using Sila at one university. Email verification and AI summaries use external services outside Sila's boundary.
 
-[**https\://canva.link/mnbu5ng6gg0l7hs**](https://canva.link/mnbu5ng6gg0l7hs)
+The container diagram shows three parts inside that boundary:
 
-**Container Diagram**
+| Part | Technology and purpose |
+| ----- | ----- |
+| WEB | React: pages, forms, rich-text editing, and display of live updates |
+| API | Python/FastAPI: requests, permissions, business rules, and WebSocket connections |
+| DB | PostgreSQL: linked records such as users, posts, and communities |
 
-| Container | Technology | Responsibility |
-| ----- | ----- | ----- |
-| WEB | React | Forms, audience selection, rich-text editing, and live-update display |
-| API | Python/FastAPI | Permissions, business rules, HTTP requests, and WebSocket connections |
-| DB | Proposed PostgreSQL | Persistent user, community, content, and moderation records |
+React sends requests to FastAPI over HTTPS. WebSockets carry saved draft updates. FastAPI accesses PostgreSQL and calls the email and AI services; the browser does not access them directly.
 
-WEB communicates with API through HTTPS and secure WebSockets. API accesses DB and calls the email and AI services. Provider credentials remain on the backend.
+React, rich text, FastAPI, WebSockets, and an LLM meet Assignment 2's technology constraints. PostgreSQL fits the linked data and lets related changes succeed or fail together.
 
-React, FastAPI, WebSockets, rich-text capabilities, and an LLM integration meet Assignment 2’s technology constraints
+### **2.2.2 Backend components**
 
-**![][image2]**
-
-[**https\://canva.link/mnbu5ng6gg0l7hs**](https://canva.link/mnbu5ng6gg0l7hs)
-
-**Component Diagram**
+The component diagram looks inside API. C1–C7 are modules in one backend, not separate applications.
 
 | Component | Responsibility |
 | ----- | ----- |
-| C1: HTTP and WebSocket Gateway | Validate and route requests and events |
-| C2: Identity and Access Control | Check accounts, roles, ownership, membership, and audiences |
+| C1: HTTP and WebSocket Gateway | Receive and route requests and events |
+| C2: Identity and Access Control | Check accounts, roles, ownership, and audiences |
 | C3: Community Management | Manage communities, membership, and official status |
-| C4: Publishing and Interaction | Manage posts, comments, likes, and content validation |
-| C5: Draft Collaboration | Manage draft versions, publishing, and live updates |
-| C6: Moderation and Appeals | Manage reports, decisions, appeals, and audit records |
-| C7: AI Integration | Prepare authorized input, call the provider, and check responses |
+| C4: Publishing and Interaction | Validate and manage posts, comments, and likes |
+| C5: Draft Collaboration | Check draft versions, save, publish, and send updates |
+| C6: Moderation and Appeals | Handle reports, decisions, appeals, and their records |
+| C7: AI Integration | Send permitted content and check summary responses |
 
-These components run within one FastAPI application and access the database through repositories.
+One backend keeps shared permission rules and database changes together.
 
-**![][image3]**
+### **2.2.3 Authentication and rich text**
 
-[**https\://canva.link/mnbu5ng6gg0l7hs**](https://canva.link/mnbu5ng6gg0l7hs)
+Users verify an approved university email address. Passwords are stored as hashes, not readable passwords. A cookie identifies the login session; logout ends it. The backend checks permissions before protected actions and updates.
 
-**Coder Task:** Confirm the database, editor, authentication, hosting, and provider choices. Keep the diagrams consistent with the final design.
+The server sanitizes rich text by removing unsafe markup before storing it. Posts allow 1–2,000 visible characters; plain-text comments allow 1–500. Empty drafts may be saved but cannot be published. These limits count Unicode code points after trimming outer whitespace.
+
+### **2.2.4 Deployment and external services**
+
+The plan uses one server running one FastAPI process so WebSocket updates share memory; more processes would need shared messaging.
+
+Email verifies accounts. AI summarizes only content the requester may access, and its result is labelled AI-generated. Failure leaves the discussion unchanged. Secrets stay in backend environment variables.
+
+Hosting and providers have not been set up. External AI processing needs university permission. Development can use mocks, meaning simulated service responses, without paid calls. The C4 figures must accompany the final report; editable Mermaid sources supplement them, and Canva edits are listed in `docs/diagrams/canva-changes.md`.
 
 ## **2.3 Behaviour and Design Decisions**
 
@@ -412,15 +416,15 @@ C2 checks permissions before protected requests, draft subscriptions, saves, and
 * Only approved community organizers edit and publish shared announcements.  
 * Moderators and administrators access only the evidence needed for their assigned reviews.
 
-C4 sanitizes rich text and rejects empty content. Limits apply to visible text: 2,000 characters per post and 500 per comment.
+C4 removes unsafe markup from rich-text posts. Published posts and plain-text comments cannot be empty. Limits are 2,000 characters per post and 500 per comment, counted as Unicode code points after trimming outer whitespace. Empty drafts may be saved while being prepared.
 
 **Publishing and Collaboration**
 
-C5 checks the submitted draft version and updates it in one database transaction. Successful saves increase the version and are broadcast after the transaction commits.
+C5 checks the submitted `version` and saves the draft as one operation, so another save cannot overwrite a newer version. Successful saves increase the version. WebSocket updates are sent only after the database saves successfully. Each save has a `request_id` so a retried save is not applied twice.
 
 Outdated saves are rejected. Organizers review the latest content and manually resolve conflicts. After reconnecting, they retrieve the latest saved draft.
 
-Publishing rechecks organizer permissions, creates the post, and marks the draft published in one transaction. Repeated requests must not create duplicate posts.
+Publishing rechecks organizer permissions and the current draft. It creates the post and records the draft link together. Draft’s unique `published_post_id` stores the result; repeated publication returns that post instead of creating another.
 
 **Sequence Diagram**
 
@@ -437,7 +441,7 @@ The diagram shows two organizers who loaded version 7\. The first save creates v
 | Outdated draft save | Reject the save and provide the latest version. |
 | Lost connection | Reauthorize and retrieve the latest draft. |
 | Database save failure | Return an error and broadcast no successful update. |
-| Lost save acknowledgement | Retrieve the current snapshot before retrying. |
+| Lost save acknowledgement | Retrieve the latest draft before retrying. |
 | Permission removed | Reject further actions and stop protected updates. |
 | AI timeout or invalid response | Return an error without changing the discussion. |
 
@@ -447,11 +451,11 @@ C6 allows moderators to dismiss reports or hide reported content. Decisions reco
 
 Affected authors may appeal within seven days. A different moderator reviews the appeal. It escalates to an administrator when independent review is unavailable or university policy is involved.
 
-Hidden content remains review evidence but is excluded from normal access and AI. Appeal resolutions are recorded. Reversing moderation does not restore content independently deleted by its author.
+Hidden content remains review evidence but is excluded from normal access and AI. Appeal resolutions are recorded. Reversing moderation only changes `hidden` back to `published`; it never restores `deleted` content. Content stays hidden if another active decision still requires it.
 
 **AI Summarization**
 
-C7 collects only the selected discussion content the requester may access. It excludes drafts, hidden content, unrelated discussions, and account metadata.
+C7 collects only the selected discussion content the requester may access. It excludes drafts, hidden or deleted content, unrelated discussions, and account metadata.
 
 External processing requires university permission. Results are labeled AI-generated and checked for nonempty content and association with the request. The original discussion remains accessible.
 
@@ -465,121 +469,174 @@ Use browser sessions to test conflicting saves, reconnection, and permission cha
 
 ## **2.4 Interfaces**
 
-**Coder Task — Complete Before Submission**
+Section 2.4.1 describes the implemented PoC. The remaining interfaces are planned for Assignment 2.
 
-Define the HTTP endpoints and WebSocket events for accounts, communities, posts, interaction, collaboration, moderation, appeals, and AI.
+### **2.4.1 Implemented proof-of-concept interface**
 
-Each contract must specify:
+FastAPI serves the page at `GET /` and the API from the same local address. The browser exchanges JSON with the backend. Both post routes need no login and use fictional content. The contract is `docs/contracts/poc-posts.md`.
 
-* Request and response fields.  
-* Required permissions.  
-* Validation and failure responses.  
-* Example messages.
+- `POST /posts` requires `application/json` containing a JSON object with a string `body`. Success returns `201` with integer `post_id` and string `body`. Invalid input returns `422` with a string `detail`.
+- `GET /posts` takes no request body and returns `200` with a JSON array, ordered by descending `post_id`. An empty feed returns `[]`.
 
-Draft contracts must include the draft ID, request ID, version, content, save acknowledgement, and conflict response. The coder must also define authentication, retries, and duplicate-publication prevention.
+Example creation on a fresh backend:
 
-The proof of concept must match one submitted contract.
+```json
+{"body":"  Club meeting today.  "}
+```
+
+```json
+{"post_id":1,"body":"Club meeting today."}
+```
+
+Retrieving that feed returns `[{"post_id":1,"body":"Club meeting today."}]`.
+
+The backend rejects non-string values without conversion, trims outer whitespace, and accepts 1–2,000 Unicode code points. Internal spaces and line breaks remain. Stored and returned text is trimmed. IDs start at 1 and increase only after successful creation. Rejected requests create nothing and consume no ID.
+
+Every documented validation failure returns `422` with one exact `detail` message:
+
+| Invalid input | Exact message |
+| ----- | ----- |
+| Malformed JSON | `Request body must be valid JSON.` |
+| JSON that is not an object | `Request body must be a JSON object.` |
+| Missing `body` | `The body field is required.` |
+| Non-string `body`, including `null` | `Post body must be a string.` |
+| Empty, whitespace-only, or over-limit text | `Post body must contain 1–2000 characters after trimming.` |
+
+Posts remain in memory after browser refresh. Restarting the backend clears posts and resets IDs. The backend's count decides acceptance; the browser counter also counts code points. HTML-like input is displayed literally using `textContent`.
+
+The page loads the feed on opening. Publish is disabled while saving. Success clears the input and reloads the feed; validation failure keeps the input and shows the error. A network failure means the result is unconfirmed, so the page does not automatically retry. It reports separately when creation succeeds but feed refresh fails.
+
+### **2.4.2 Proposed Assignment 2 HTTP interfaces**
+
+All routes below start with `/api/v1` and use HTTPS and JSON. A login cookie identifies the user. C2 checks verification, ownership, roles, and audience; sending a user ID cannot grant permission.
+
+Success uses `200` for reads/updates, `201` for creation, and `204` for deletion with no response body. Errors contain a string `detail`: `401` means login is missing or invalid; `403`, permission denied; `404`, unavailable or hidden resource; `409`, conflicting state; `422`, invalid input; `500`, unexpected server failure; `502`, failed or invalid provider response; `503`, service unavailable; and `504`, provider timeout. Errors do not expose secrets.
+
+| Route, after `/api/v1` | Main fields exchanged | Who is allowed; main failures |
+| ----- | ----- | ----- |
+| `POST /accounts`, `POST /accounts/verify`, `POST /sessions`, `DELETE /sessions/current` | `email`, `password`, or verification `token`; return verification status or `user_id` and roles | Registration/login need no session; logout needs one. Approved university email required. `401`, `422`. |
+| `POST /communities`, `POST /communities/{community_id}/memberships` | `name`, `visibility`; return `community_id` or membership `status` | Verified users. Restricted joins await organizer approval. `403`, `422`. |
+| `POST /communities/{community_id}/official-requests`, `PATCH /official-requests/{request_id}` | Request `reason`; decision `status`; return `request_id`, `community_id`, `status` | Organizers request; administrators decide. `403`, `409`, `422`. |
+| `GET /posts`, `POST /posts`, `PATCH /posts/{post_id}`, `DELETE /posts/{post_id}` | `body`, `audience`, optional `community_id`; returned posts include `post_id`, `author_id` | Verified users; viewers must be in the audience, authors edit/delete. Restricted-community posts stay restricted. `403`, `404`, `422`. |
+| `PUT /posts/{post_id}/likes/me`, `DELETE /posts/{post_id}/likes/me`, `POST /posts/{post_id}/comments` | Like result: `post_id`, `liked`; comment: `body` → `comment_id`, `post_id`, `author_id`, `body` | Permitted viewers. One like per user/post; comments 1–500 characters. `403`, `404`, `422`. |
+| `POST /reports`, `POST /reports/{report_id}/decisions` | `target_type`, `target_id`, `reason`; decision `action`, `reason`; return `report_id`, `status` or `decision_id`, `action`, `decided_at` | Users report accessible content; authorized moderators decide. `403`, `404`, `409`, `422`. |
+| `POST /decisions/{decision_id}/appeals`, `PATCH /appeals/{appeal_id}` | `reason`; resolution `outcome`, `reason`; return `appeal_id`, `status`, `submitted_at` or outcome/time | Affected author appeals within seven days. A different moderator reviews; escalations need an administrator. `403`, `422`. |
+| `GET /drafts/{draft_id}`, `POST /drafts/{draft_id}/publish` | Read: `draft_id`, `body`, `version`; publish: `request_id`, `version` → `draft_id`, `post_id`, `status` | Approved organizers of that community. `403`, `404`, `409`, `422`. |
+| `POST /posts/{post_id}/summary` | Return `post_id`, `summary`, `ai_generated: true` | Permitted viewers; backend selects the discussion text. `403`, `404`, `502`, `503`, `504`. |
+
+Post content is sanitized before its 2,000-character limit is checked. Only permitted content is returned.
+
+### **2.4.3 Proposed collaboration interface**
+
+Organizers connect to `/api/v1/drafts/{draft_id}/events` over WebSocket. Permissions are checked before saves and protected updates. A save sends the version the organizer loaded:
+
+```json
+{"type":"draft.save","draft_id":42,"request_id":"save-42-a","version":7,"body":"<p>Club meeting at 4 pm.</p>"}
+```
+
+The backend checks the version and saves together. Success sends `draft.saved` with `draft_id`, `request_id`, saved `body`, and the new `version` (8 here), then broadcasts the saved update. An outdated save gets `draft.conflict` with those identifiers, the latest body/version, and an explanatory `detail`. Organizers resolve the conflict manually.
+
+Other failures send `draft.error` with `draft_id`, `request_id`, `code`, and `detail`. Denied users receive no draft content. A failed save broadcasts nothing. These are WebSocket messages, not HTTP status codes.
+
+Each save has a request ID so a retried save is not applied twice. Reconnecting reloads the latest draft after checking permission.
+
+Publishing saves the post and its draft link together. Draft's unique `published_post_id` identifies the published result. First publication returns `201`; repeating it returns that same post with `200`. An outdated unpublished draft returns `409`.
+
+### **2.4.4 Proposed external service interfaces**
+
+The backend sends the email service a university address and verification link, and receives acceptance or failure. Acceptance does not verify the account; the user must follow a valid link. Failed delivery can be retried.
+
+For AI, the backend sends only authorized published discussion text, excluding drafts and hidden/deleted content. It checks that the response is nonempty and belongs to the requested discussion, then labels it AI-generated. Failure leaves the discussion unchanged. University permission is required before external processing. These services are planned, not connected in the PoC.
 
 ## **2.5 Code and Repository Structure**
 
-**Coder Task — Confirm Against the Actual Repository**
+The current repository contains the Assignment 1 PoC. Assignment 2 folders below are planned, not implemented.
 
-| Proposed Location | Contents |
+| Current location | Contents |
 | ----- | ----- |
-| frontend/ | React pages, forms, editor, and WebSocket client |
-| backend/app/api/ | HTTP routes and WebSocket gateway |
-| backend/app/services/ | Backend business components |
-| backend/app/models/ | Database definitions |
-| backend/app/repositories/ | Database queries and transactions |
-| backend/tests/ and frontend/tests/ | Component and integration tests |
-| docs/report/ | Final report |
-| docs/diagrams/ | Editable diagrams and exports |
-| docs/contracts/ | Interface specifications |
-| docs/adr/ | Architecture decision records |
-| config/ and .env.example | Nonsecret configuration examples |
-| poc/ | Proof-of-concept implementation |
-| [README.md](http://README.md) | Setup and run instructions |
+| `poc/app/main.py` | FastAPI routes, validation, and in-memory posts |
+| `poc/app/index.html` | Browser page, styling, and JavaScript |
+| `poc/tests/` | Contract tests |
+| `poc/requirements.txt`, `poc/README.md` | Dependencies, setup, tests, and demo instructions |
+| `docs/contracts/`, `docs/report/` | PoC contract and report sections |
+| `docs/diagrams/` | Mermaid sources and Canva change checklist |
+| `.github/workflows/poc-tests.yml` | Automated PoC checks on GitHub |
+| `CLAUDE.md`, `.gitignore` | AI workflow instructions and files excluded from Git |
 
-The coder must confirm actual folders and assign ownership.
+| Planned location | Responsibility |
+| ----- | ----- |
+| `frontend/` | React pages, rich-text editor, and WebSocket client |
+| `backend/app/api/` | C1: HTTP routes and WebSocket messages |
+| `backend/app/services/` | C2–C7: permission checks and business rules |
+| `backend/app/models/`, `backend/app/repositories/` | Database records and access |
+| `backend/app/integrations/` | Email and AI service calls |
+| `backend/app/core/` | Shared settings and login helpers |
+| `backend/tests/`, `frontend/tests/` | Backend, browser, and integration tests |
+| `config/`, `.env.example` | Configuration examples with placeholders only |
 
-Database passwords, session secrets, email credentials, and AI keys must remain in backend environment variables or a secret manager. They must not appear in the repository or browser code.
+This separates pages, business rules, and data access so each can be tested. Assignment 2 will sit alongside `poc/`, keeping the demonstration reproducible. Mohammed is responsible for the current PoC under the recorded team allocation; Assignment 2 ownership must be agreed in Section 3.1.
 
-## 
-
-## 
-
-## 
-
-## 
-
-## 
-
-## 
+Secrets belong only in backend environment variables, never in Git or browser code. Local environments and personal settings are excluded from Git. Existing documentation folders will also hold Assignment 2 material. The original editable Canva figures and final report PDF still need to be included for submission.
 
 ## **2.6 Data Model**
 
-## The ER diagram shows the records needed to support Sila’s features and policies.
+The PoC stores only integer `post_id` and string `body` in memory. The ER diagram describes the planned PostgreSQL model for Assignment 2, not an existing database.
 
-## **![][image5]**
+### **2.6.1 Entities and relationships**
 
-## **![][image6]**
+Each entity has an ID. References link related records; for example, `author_id` links a post to a user. Membership and Like identify their records using a pair of IDs.
 
-**![][image7]**
-
-[**https\://canva.link/mnbu5ng6gg0l7hs**](https://canva.link/mnbu5ng6gg0l7hs)
-
-| Entity | Purpose |
+| Entity | Main information and links |
 | ----- | ----- |
-| User | Store verified accounts and global roles |
-| Community | Store community information, visibility, and official status |
-| Membership | Connect users and communities with membership status and role |
-| Post | Store published content, author, audience, and visibility status |
-| Draft | Store shared content, version, and publication state |
-| Comment | Store comments associated with posts |
-| Like | Store one active like per user and post |
-| OfficialRequest | Store official-community requests and review outcomes |
-| Report | Store reports against posts or comments |
-| Decision | Store initial moderation decisions |
-| Appeal | Store appeals and their outcomes |
-| AuditRecord | Store moderation and appeal action history |
+| User | `user_id`, unique `email`, `password_hash`, `verified`, `global_role` |
+| Community | `community_id`, `creator_id`, `name`, `visibility`, `official` |
+| Membership | `user_id`, `community_id`, `role`, `status` |
+| Post | `post_id`, `author_id`, optional `community_id`, `audience`, `body`, `status` |
+| Draft | `draft_id`, `community_id`, `owner_id`, `body`, `version`, `status`, optional unique `published_post_id` |
+| Comment | `comment_id`, `post_id`, `author_id`, `body`, `status` |
+| Like | `user_id`, `post_id` |
+| OfficialRequest | `request_id`, `community_id`, `requester_id`, optional `reviewer_id`, `reason`, `status` |
+| Report | `report_id`, `reporter_id`, one target (`post_id` or `comment_id`), `reason`, `status` |
+| Decision | `decision_id`, `report_id`, `moderator_id`, `action`, `reason`, `decided_at` |
+| Appeal | `appeal_id`, `decision_id`, `appellant_id`, optional `reviewer_id`, `reason`, `status`, `submitted_at`; resolution adds `outcome`, `resolution_reason`, `resolved_at` |
+| AuditRecord | `audit_id`, `actor_id`, `action`, `target_type`, `target_id`, `reason`, `recorded_at` |
 
-**Relationships and Constraints**
+Supporting account records hold login sessions and email verification information; their implementation details are outside this ER overview.
 
-* Users and communities have a many-to-many relationship through Membership.  
-* Organizer roles apply to individual communities.  
-* Communities contain posts and drafts; ordinary university-wide posts may have no community.  
-* Posts have comments and likes.  
-* Each user has at most one active like per post.  
-* Each report targets exactly one post or comment.  
-* Each report has at most one initial decision, and each decision has at most one appeal.  
-* A draft may link to one published post; the link is unique.  
-* Restricted content requires approved membership.  
-* Only affected authors may appeal within seven days.  
-* Ordinary users cannot modify audit records.
+### **2.6.2 Constraints and policies**
 
-**Coder Task:** Finalize field types, foreign keys, indexes, authentication support records, migrations, and retention rules.
+- Users join communities through Membership. Organizer roles belong to a community, not the whole university. Only approved organizers edit and publish its drafts.
+- A user has at most one membership per community and one like per post. Removing a like removes that pair.
+- A university-wide post may have no community. Community-only posts require one; restricted-community content is limited to approved members.
+- Posts contain sanitized rich text, limited to 2,000 visible characters. Comments contain plain text, limited to 500. Published content cannot be empty.
+- Post and Comment `status` is `published`, `hidden`, or `deleted`. Reversing moderation only changes `hidden` back to `published`; it never restores `deleted` content. Content stays hidden if another active decision still requires it.
+- Draft saves check the loaded version and increase it on success. Publication creates the post and records Draft's unique `published_post_id` together, after checking the draft. Repeated publication returns the linked post instead of creating another.
+- Each report targets exactly one post or comment. Each report has at most one initial decision; each decision has at most one appeal. Only the affected author may appeal within seven days of `decided_at`; a different moderator reviews it.
+- Decisions and appeal outcomes are recorded. Hidden content remains available as review evidence, but not in normal views or AI input. Ordinary users cannot change audit records.
+
+The backend checks permissions; database keys and constraints prevent broken links and duplicates. `docs/diagrams/assignment-2-data-model.mmd` shows the same core relationships. Required changes to the original Canva ER figures are listed in `docs/diagrams/canva-changes.md`.
 
 ## **2.7 Architecture Decision Records**
 
 **ADR-01 — Modular Backend**
 
-**Context:** Sila’s features share authorization and database transactions.
+**Context:** Sila’s features share permission rules and related database changes.
 
-**Options:** Unstructured backend, modular backend, or microservices.
+**Options:** One unstructured backend, one modular backend, or several separate services.
 
 **Decision:** Use one FastAPI application divided into components C1–C7.
 
-**Consequences:** Development, deployment, and testing remain manageable. Multiple WebSocket processes would require shared event distribution.
+**Consequences:** One server running one FastAPI process keeps development manageable and lets WebSocket updates share memory. More processes would need shared messaging.
 
 **ADR-02 — Relational Database**
 
-**Context:** Records have relationships, and concurrent draft saves require transactions.
+**Context:** Records have relationships, and simultaneous draft saves must not overwrite each other.
 
 **Options:** In-memory storage, SQLite, PostgreSQL, or a document database.
 
-**Decision:** Propose PostgreSQL for the planned application.
+**Decision:** Use PostgreSQL for Assignment 2. The Assignment 1 PoC keeps its in-memory list.
 
-**Consequences:** Supports constraints and atomic updates; requires setup, migrations, and backups.
+**Consequences:** Database rules protect linked records and let related changes succeed or fail together. PostgreSQL needs setup, controlled schema changes, and backups.
 
 **ADR-03 — Versioned Collaboration**
 
@@ -587,21 +644,21 @@ Database passwords, session secrets, email credentials, and AI keys must remain 
 
 **Options:** Last-save-wins, version checks, or automatic merging.
 
-**Decision:** Use atomic version checks and WebSocket broadcasts after saving.
+**Decision:** Check the loaded version and save together. Send WebSocket updates only after saving succeeds.
 
-**Consequences:** Prevents silent overwrites, but organizers must manually reconcile conflicts.
+**Consequences:** Prevents silent overwrites, but organizers must compare conflicting versions and resolve them manually.
 
 **ADR-04 — Backend AI Integration**
 
 **Context:** Summarization must respect permissions and protect credentials.
 
-**Options:** Browser calls, provider calls across multiple routes, or a dedicated backend adapter.
+**Options:** Call the provider from the browser, from several backend routes, or through one backend component.
 
-**Decision:** C7 handles input filtering, provider calls, response checks, and failures.
+**Decision:** C7 selects permitted content, calls the provider, checks the response, and handles failures.
 
 **Consequences:** Supports mocks and provider replacement. Accuracy is not guaranteed, and external processing requires university permission.
 
-**Status:** Technical decisions require coder and team confirmation before submission.
+**Status:** These are planned Assignment 2 decisions for team review. Hosting, providers, and university permissions remain open. They are not implemented in the PoC.
 
 ---
 
@@ -700,3 +757,49 @@ The sequential workflow also made it easy to follow progress, since each complet
 One improvement for future projects would be to set smaller internal deadlines, even when the team is working efficiently. This would provide extra time for final reviews and unexpected delays.
 
 Overall, the Sila project has been managed through clear responsibilities, open communication, shared documents, and regular progress updates.
+
+---
+
+# **4 Proof of Concept**
+
+## **4.1 Purpose and scope**
+
+The PoC demonstrates a browser creating and retrieving posts through a Python backend. It covers part of FR-03 using fictional data. The code is in `poc/`; `poc/README.md` explains setup, execution, tests, and the demonstration. Section 2.4.1 describes the implemented contract.
+
+## **4.2 Implementation**
+
+FastAPI serves one HTML page containing CSS and JavaScript. The page has a textbox, character counter, Publish button, and newest-first feed.
+
+The browser sends `body` to `POST /posts`. The backend trims outer whitespace, checks the 1–2,000-code-point limit, assigns `post_id`, and stores the post in a Python list. Success returns `201`. `GET /posts` returns the list newest first with `200`. Invalid input returns `422` with the contract's exact message. Rejected requests consume no ID.
+
+The backend decides whether text is valid. Both sides count Unicode code points; some visible emoji contain several. `textContent` displays HTML-like input as text, so it cannot become page markup.
+
+Publish is disabled while saving. Success clears the input and reloads the feed. Validation failures preserve the input. A lost network response leaves the result uncertain; a successful save followed by a failed feed refresh has a separate message.
+
+## **4.3 Verification**
+
+The recorded automated run passed 28 tests covering the contract's valid and invalid inputs, trimming, IDs, ordering, and the 2,000/2,001 boundaries, including emoji. GitHub Actions also passed on the branch, PR, and merged `main`.
+
+These tests check the API and page response, not execution of browser JavaScript. [PR #1](https://github.com/lum-afk/Campus-Social-Network-Project/pull/1) records separate browser checks. The README explains how to repeat the demonstration. No production performance or full accessibility result is claimed.
+
+## **4.4 Simplifications and limitations**
+
+| Planned system | PoC |
+| ----- | ----- |
+| React and rich text | HTML/CSS/JavaScript and plain text |
+| PostgreSQL | Temporary Python list |
+| Verified users and audience controls | No login or permissions |
+| C1–C7 and WebSocket collaboration | One small backend using HTTP |
+| Communities, moderation, and AI | Omitted |
+
+Browser refresh preserves posts while the backend runs. Restarting it clears posts and resets IDs. The PoC uses one process because separate processes would have separate lists.
+
+The demo plan has a three-minute limit: show an empty feed; publish two posts; show trimming, newest-first order, and literal HTML; reject whitespace-only input; refresh; then restart to show data loss. A timed rehearsal has not been recorded.
+
+## **4.5 Development record and AI assistance**
+
+Development used `feature/poc-posts`, with separate commits for the contract, code/tests, documentation, and CI. PR #1 was merged into `main` on 14 October 2026, preserving those commits.
+
+Claude Code assisted with the plan, code, tests, and README. Codex assisted with repository setup, CI, workflow documentation, and the report. Commits and the PR identify AI assistance. The team remains responsible for reviewing and understanding the work.
+
+PR #1 was merged before any teammate review. A post-merge review was requested from @lum-afk.

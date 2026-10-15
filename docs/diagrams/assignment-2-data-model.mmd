@@ -1,0 +1,119 @@
+erDiagram
+    USER ||--o{ COMMUNITY : creates
+    USER ||--o{ MEMBERSHIP : holds
+    COMMUNITY ||--o{ MEMBERSHIP : has
+    USER ||--o{ POST : authors
+    COMMUNITY o|--o{ POST : groups
+    COMMUNITY ||--o{ DRAFT : owns
+    USER ||--o{ DRAFT : owns
+    DRAFT o|--o| POST : publishes
+    POST ||--o{ COMMENT : contains
+    USER ||--o{ COMMENT : authors
+    POST ||--o{ LIKE : receives
+    USER ||--o{ LIKE : gives
+    COMMUNITY ||--o{ OFFICIAL_REQUEST : receives
+    USER ||--o{ OFFICIAL_REQUEST : requests
+    USER o|--o{ OFFICIAL_REQUEST : reviews
+    USER ||--o{ REPORT : submits
+    POST o|--o{ REPORT : target_option
+    COMMENT o|--o{ REPORT : target_option
+    REPORT ||--o| DECISION : receives
+    USER ||--o{ DECISION : makes
+    DECISION ||--o| APPEAL : receives
+    USER ||--o{ APPEAL : submits
+    USER o|--o{ APPEAL : reviews
+    USER ||--o{ AUDIT_RECORD : acts
+
+    USER {
+        id user_id PK
+        text email UK
+        text password_hash
+        boolean verified
+        text global_role
+    }
+    COMMUNITY {
+        id community_id PK
+        id creator_id FK
+        text name
+        text visibility
+        boolean official
+    }
+    MEMBERSHIP {
+        id user_id PK, FK
+        id community_id PK, FK
+        text role
+        text status
+    }
+    POST {
+        id post_id PK
+        id author_id FK
+        id community_id FK "optional"
+        text audience
+        text body
+        text status "published, hidden, deleted"
+    }
+    DRAFT {
+        id draft_id PK
+        id community_id FK
+        id owner_id FK
+        text body
+        integer version
+        text status
+        id published_post_id FK, UK "optional"
+    }
+    COMMENT {
+        id comment_id PK
+        id post_id FK
+        id author_id FK
+        text body
+        text status "published, hidden, deleted"
+    }
+    LIKE {
+        id user_id PK, FK
+        id post_id PK, FK
+    }
+    OFFICIAL_REQUEST {
+        id request_id PK
+        id community_id FK
+        id requester_id FK
+        id reviewer_id FK "optional"
+        text reason
+        text status
+    }
+    REPORT {
+        id report_id PK
+        id reporter_id FK
+        id post_id FK "optional; exactly one target"
+        id comment_id FK "optional; exactly one target"
+        text reason
+        text status
+    }
+    DECISION {
+        id decision_id PK
+        id report_id FK, UK
+        id moderator_id FK
+        text action
+        text reason
+        datetime decided_at
+    }
+    APPEAL {
+        id appeal_id PK
+        id decision_id FK, UK
+        id appellant_id FK
+        id reviewer_id FK "optional"
+        text reason
+        text status
+        datetime submitted_at
+        text outcome "optional"
+        text resolution_reason "optional"
+        datetime resolved_at "optional"
+    }
+    AUDIT_RECORD {
+        id audit_id PK
+        id actor_id FK
+        text action
+        text target_type
+        id target_id
+        text reason
+        datetime recorded_at
+    }
