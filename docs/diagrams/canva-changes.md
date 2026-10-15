@@ -1,6 +1,8 @@
 # Canva changes for the simplified Sila report
 
-Apply these edits to the original figures before exporting the final report. This checklist compares the revised report with the Canva figures embedded in the supplied team-report PDF (pages 12–14, 16, and 19–20). It does not claim that the live Canva document has been updated. All diagrams describe the planned Assignment 2 system.
+> Verification update — 15 October 2026: the final Google Doc images were inspected against this checklist. The revised container, sequence, and ER labels are present, including both publishing-policy notes and the database result “Saved body A, version 8”. The seven matching PNGs are listed in README.md. The checklist below records the original requested edits.
+
+This checklist compares the revised report with the original Canva figures embedded in the earlier team-report PDF (pages 12–14, 16, and 19–20). All diagrams describe the planned Assignment 2 system.
 
 ## Context diagram
 
