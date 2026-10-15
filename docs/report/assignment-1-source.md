@@ -401,7 +401,7 @@ The plan uses one server running one FastAPI process so WebSocket updates share 
 
 Email verifies accounts. AI summarizes only content the requester may access, and its result is labelled AI-generated. Failure leaves the discussion unchanged. Secrets stay in backend environment variables.
 
-Hosting and providers have not been set up. External AI processing needs university permission. Development can use mocks, meaning simulated service responses, without paid calls. The C4 figures must accompany the final report; editable Mermaid sources supplement them, and Canva edits are listed in `docs/diagrams/canva-changes.md`.
+Hosting and providers have not been set up. External AI processing needs university permission. Development can use mocks, meaning simulated service responses, without paid calls.
 
 ## **2.3 Behaviour and Design Decisions**
 
@@ -574,7 +574,7 @@ The current repository contains the Assignment 1 PoC. Assignment 2 folders below
 
 This separates pages, business rules, and data access so each can be tested. Assignment 2 will sit alongside `poc/`, keeping the demonstration reproducible. Mohammed is responsible for the current PoC under the recorded team allocation; Assignment 2 ownership must be agreed in Section 3.1.
 
-Secrets belong only in backend environment variables, never in Git or browser code. Local environments and personal settings are excluded from Git. Existing documentation folders will also hold Assignment 2 material. The original editable Canva figures and final report PDF still need to be included for submission.
+Secrets belong only in backend environment variables, never in Git or browser code. Local environments and personal settings are excluded from Git. Existing documentation folders will also hold Assignment 2 material.
 
 ## **2.6 Data Model**
 
@@ -612,7 +612,7 @@ Supporting account records hold login sessions and email verification informatio
 - Each report targets exactly one post or comment. Each report has at most one initial decision; each decision has at most one appeal. Only the affected author may appeal within seven days of `decided_at`; a different moderator reviews it.
 - Decisions and appeal outcomes are recorded. Hidden content remains available as review evidence, but not in normal views or AI input. Ordinary users cannot change audit records.
 
-The backend checks permissions; database keys and constraints prevent broken links and duplicates. `docs/diagrams/assignment-2-data-model.mmd` shows the same core relationships. Required changes to the original Canva ER figures are listed in `docs/diagrams/canva-changes.md`.
+The backend checks permissions; database keys and constraints prevent broken links and duplicates. `docs/diagrams/assignment-2-data-model.mmd` shows the same core relationships.
 
 ## **2.7 Architecture Decision Records**
 
@@ -686,75 +686,122 @@ These excluded features may be considered for future development, but they are n
 
 ---
 
-# ***3\. Project Management and Team Collaboration***
+# **3  Project Management and Team Collaboration**
 
-## **3.1 Team Roles and Responsibilities**
+## **3.1 Team Structure**
 
-At the beginning of the Sila project, Fatma took responsibility for dividing the tasks among the team members. She assigned the work based on each member's strengths and what she believed they would feel comfortable doing.
+For Assignment 2, the Sila team will continue using the same division of responsibilities established during Assignment 1\. Tasks were originally assigned by Fatma based on each member's strengths and comfort level. Everyone agreed to their responsibilities.
 
-After sharing the task division through Microsoft Teams, Fatma asked everyone whether they were comfortable with their responsibilities. She also explained that the tasks could be rearranged if anyone preferred a different role. All team members agreed to their original assignments, so no changes were needed.
-
-Our responsibilities were divided as follows:
-
-| Team Member | Responsibilities |
+| Team Member | Main Responsibilities |
 | ----- | ----- |
-| Fatma and Fatima | Sections 1.1, 1.2, 1.4, and 1.5: Stakeholders, Functional Requirements, User Stories, and Requirements Validation and Traceability |
-| Salama | Section 1.3: Nonfunctional Requirements, and Section 2: System Architecture |
-| Fatma | Section 3: Project Management and Team Collaboration |
-| Mohammed | Section 4: Proof of Concept, including coding and implementation |
+| Fatma and Fatima | Maintain the requirements, user stories, acceptance criteria, and traceability documentation. Help verify that the application follows the agreed requirements. |
+| Salama | Maintain the system architecture, diagrams, and design documentation. Check that the implementation remains consistent with the architecture. |
+| Fatma | Coordinate project management, task allocation, progress tracking, and documentation of the development plan. |
+| Mohammed | Lead the implementation and maintenance of the frontend, backend, database, and integration code. |
 
-Although each member had specific responsibilities, the team could still support one another and improve the overall report.
+Although each member has specific responsibilities, the team will remain flexible. If someone needs help with a task, any available team member can assist. This will help prevent delays and allow members to learn about different parts of the system.
 
-## **3.2 Task Organization and Progress Tracking**
+**Coordination and Knowledge Sharing**
 
-The team followed a sequential workflow, meaning each member or group completed their assigned work before passing it to the next person.
+Microsoft Teams will remain the main communication platform for discussing tasks, asking questions, and sharing updates. Google Docs will be used for report collaboration, while GitHub will be used to share and review code changes. Canva will be used to maintain the architecture diagrams.
 
-Fatma and Fatima were the first to complete their sections. Once they finished, they shared their work in the Microsoft Teams group chat and informed the team that the next stage could begin.
+When a change affects both the code and the requirements or architecture, the responsible members will communicate before finalizing it. Team members will also review important updates so that everyone understands how the different parts of Sila work together.
 
-Salama then continued from their work. She reviewed the existing sections, made improvements, and added her assigned parts, with Fatma's help when needed. After finishing, Salama shared the updated document with the group and informed everyone that it was Mohammed's turn to continue with the proof of concept.
+## **3.2 Development Workflow**
 
-This approach helped the team track progress because everyone knew which stage had been completed and who was responsible for the next stage.
+All code and documentation will be maintained in one shared GitHub repository. Assignment 2 will build on the workflow introduced during Assignment 1\.
 
-## **3.3 Communication and Collaboration Tools**
+**Branches and Pull Requests**
 
-The team used four main tools throughout the project:
+The `main` branch will hold reviewed, working code. Each task will have its own short-lived branch, such as `feature/user-login` or `feature/community-posts`.
 
-* **Microsoft Teams:** The main communication platform, used to discuss responsibilities, share progress updates, and inform each other when tasks were completed.  
-* **Google Docs:** The main workspace for writing the report. Fatma shared the document link in the Teams group chat so everyone could access it, edit their sections, and review the work.  
-* **Canva:** Used by Salama to create and edit the diagrams and visual frameworks included in the report.  
-* **GitHub:** Used by Mohammed to upload and merge the project code. Other team members could also view the repository to follow his progress and check the latest updates.
+Changes will be submitted through pull requests (PRs) explaining what was changed, how it was tested, and whether AI tools were used.
 
-These tools helped the team keep the report and code organized while allowing everyone to stay informed about the project's progress.
+**Code Review**
 
-## **3.4 Time Management**
+At least one teammate will review each pull request before it is merged. The reviewer will check that the changes match the requirements, follow the interface contracts, and pass the relevant tests.
 
-The team did not set separate deadlines for each member. Instead, everyone agreed that the main goal was to complete the assignment before the official submission deadline.
+During Assignment 1, PR \#1 was merged before a teammate reviewed it. A review was requested afterward. For Assignment 2, the team plans to require teammate approval before merging.
 
-Each member began their assigned work once the previous stage was completed. Everyone worked efficiently and shared their work without unnecessary delays.
+**Automated Checks**
 
-This approach allowed the team to make steady progress while keeping the workload manageable and avoiding unnecessary pressure.
+GitHub Actions will run automated tests when pull requests are submitted. The team plans to avoid merging changes when required tests fail.
 
-## **3.5 Teamwork and Challenges**
+Testing will gradually expand to cover the frontend, backend, and integration between components.
 
-The team's collaboration has gone smoothly so far, without any disagreements or conflicts.
+**Issues and Task Tracking**
 
-One reason for this was that everyone had the opportunity to agree to their responsibilities before starting. Communication also remained open through Microsoft Teams, allowing members to share updates and ask for help when needed.
+The team proposes using GitHub Issues to organize Assignment 2 tasks. Each issue will describe the work and identify the responsible member.
 
-Team members supported one another by reviewing and improving existing work rather than treating every section as completely separate. For example, Salama reviewed the requirements sections before adding her own work, and Fatma helped her with some of the improvements.
+A GitHub Projects board can track tasks using four stages: *To do*, *In progress*, *In review*, and *Done*.
 
-Overall, the collaboration has been organized and positive, allowing the team to move through the assignment without major difficulties.
+Pull requests will be linked to their related issues so the team can follow development progress.
 
-## **3.6 Reflection on the Project Management Approach**
+**Recording Decisions and Requirement Changes**
 
-The team's approach worked well because everyone understood their responsibilities and felt comfortable with their tasks. Allowing members to agree to their assignments helped establish a clear division of work from the beginning.
+Interface contracts will be maintained in `docs/contracts/`, while important architecture decisions will be recorded through Architecture Decision Records (ADRs).
 
-The sequential workflow also made it easy to follow progress, since each completed stage was shared with the group before the next stage began.
+If a requirement or design decision changes, the team will review the change and update the relevant documentation to keep the report and implementation consistent.
 
-One improvement for future projects would be to set smaller internal deadlines, even when the team is working efficiently. This would provide extra time for final reviews and unexpected delays.
+**Reviewing AI-Assisted Work**
 
-Overall, the Sila project has been managed through clear responsibilities, open communication, shared documents, and regular progress updates.
+The team may use AI development tools, including Claude Code and Codex, to assist with coding, testing, and documentation. However, all AI-generated work must be reviewed by a team member.
 
----
+The team will follow these steps:
+
+1. Review and approve the proposed approach before implementing major changes.
+2. Check that AI-generated code follows the approved requirements and interface contracts.
+3. Run automated tests and manually test important features.
+4. Make sure the responsible team member understands the code and can explain it independently.
+5. Record AI assistance honestly in commits or pull request descriptions.
+6. Require human review and avoid sharing passwords, API keys, or other secrets with AI tools.
+
+These practices will help the team maintain code quality and understand the submitted application.
+
+## **3.3 Development Approach**
+
+For Assignment 2, the Sila team plans to use an Agile approach with short development iterations. This approach allows the team to build the application gradually, test each feature, and make improvements based on feedback.
+
+The team will prioritize the main features first, including university account verification, communities, posts, and audience controls. After these features work correctly, development will continue with likes, comments, real-time collaboration, moderation, and AI discussion summaries.
+
+At the end of each iteration, the team will review the completed features and check whether they meet the functional requirements and acceptance criteria from Section 1\.
+
+Microsoft Teams will be used for communication, while GitHub will be used to manage development tasks and code changes. Testing and documentation will take place throughout development rather than being left until the final week.
+
+This approach suits the team because it provides flexibility, allows members to support one another, and makes it easier to identify problems early.
+
+## **3.4 Project Risks**
+
+The team identified several risks that could affect the development of Sila during Assignment 2\.
+
+| Risk | Likelihood | Impact | Prevention or Response |
+| ----- | ----- | ----- | ----- |
+| Integration problems between the frontend and backend | Medium | High | Agree on API contracts early and test communication between components regularly. |
+| Real-time collaboration may be difficult to implement | High | High | Develop and test WebSocket communication separately before connecting it to the full application. |
+| Unauthorized access to private content | Medium | High | Apply backend permission checks and test restricted access. |
+| AI-generated summaries may be inaccurate or unavailable | Medium | Medium | Check AI responses, keep original discussions accessible, and display errors when summarization fails. |
+| Development delays | Medium | High | Track progress through GitHub and Microsoft Teams, prioritize essential features, and allow teammates to help when needed. |
+| Code changes may introduce errors | Medium | Medium | Use pull requests, teammate reviews, and automated tests before merging changes. |
+
+The team will review these risks throughout development and adjust the plan if new problems appear.
+
+## **3.5 Assignment 2 Timeline**
+
+The Sila team is currently in Week 8, and Assignment 2 is due in Week 14\. The team plans to organize development across the remaining weeks, with each milestone producing features that can be demonstrated and tested.
+
+| Timeline | Milestone | Demonstrable Result |
+| ----- | ----- | ----- |
+| Week 8 | Project setup and planning | Confirm the architecture, assign development tasks, prepare the React and FastAPI environments, and verify that the existing proof of concept runs. |
+| Week 9 | User accounts and communities | Students can register, log in, and create or join communities using test email verification. |
+| Week 10 | Posts and interactions | Students can create posts, select audiences, view permitted content, like posts, and add comments. |
+| Week 11 | Real-time collaboration | Authorized organizers can edit shared announcements, receive WebSocket updates, and detect conflicting changes. |
+| Week 12 | Moderation and AI integration | Moderators can review reports, users can submit appeals, and students can request AI-generated discussion summaries. |
+| Week 13 | Testing and improvements | The team tests permissions, errors, performance, and integration between components, while updating documentation. |
+| Week 14 | Final review and submission | The team demonstrates the working application, completes the report and repository, and submits Assignment 2\. |
+
+Progress will be tracked through GitHub, with updates shared through Microsoft Teams. Testing and documentation will take place throughout development rather than only during the final week.
+
+If delays occur, the team will focus on completing the required features first and postpone any optional improvements.
 
 # **4 Proof of Concept**
 
