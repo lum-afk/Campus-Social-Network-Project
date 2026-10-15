@@ -34,4 +34,4 @@ Supporting account records hold login sessions and email verification informatio
 - Each report targets exactly one post or comment. Each report has at most one initial decision; each decision has at most one appeal. Only the affected author may appeal within seven days of `decided_at`; a different moderator reviews it.
 - Decisions and appeal outcomes are recorded. Hidden content remains available as review evidence, but not in normal views or AI input. Ordinary users cannot change audit records.
 
-The backend checks permissions; database keys and constraints prevent broken links and duplicates. `docs/diagrams/assignment-2-data-model.mmd` shows the same core relationships. Required changes to the original Canva ER figures are listed in `docs/diagrams/canva-changes.md`.
+The backend checks permissions; database keys and constraints prevent broken links and duplicates. `docs/diagrams/assignment-2-data-model.mmd` shows the same core relationships.
